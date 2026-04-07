@@ -2,6 +2,7 @@
   "name": "ambassador",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@10.25.0",
   "scripts": {
     "dev": "next dev -p 7171",
     "build": "next build",
@@ -10,8 +11,8 @@
     "lint:js": "eslint . --cache --cache-location .eslintcache --ext .js,.jsx,.cjs,.mjs",
     "lint:ts": "eslint . --cache --cache-location .eslintcache --ext .ts,.tsx,.cts,.mts",
     "lint:css": "stylelint \"src/**/*.css\" --cache --cache-location .stylelintcache",
-    "lint:html": "node ./scripts/lint-html.mjs",
-    "type-check": "node ./scripts/type-check.mjs",
+    "lint:html": "files=$(find public src -type f \\( -name '*.html' -o -name '*.htm' \\) -print 2>/dev/null); if [ -n \"$files\" ]; then pnpm exec html-validate $files; else echo 'No HTML files found. Skipping HTML lint.'; fi",
+    "type-check": "rm -rf .next/types .next/dev/types && pnpm exec next typegen && pnpm exec tsc --noEmit",
     "prune:css": "pnpm build && purgecss --css \".next/**/*.css\" --content \"src/**/*.{ts,tsx}\" --content \"src/**/*.css\" --output .next/purgecss"
   },
   "dependencies": {
