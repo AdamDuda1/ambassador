@@ -1,4 +1,5 @@
 import {
+  isSameOriginRequest,
   jsonError,
   posterErrorResponse,
   requirePosterSession,
@@ -10,6 +11,10 @@ export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   try {
+    if (!isSameOriginRequest(request)) {
+      return Response.json({ error: "forbidden" }, { status: 403 });
+    }
+
     await requirePosterSession();
     const formData = await request.formData();
     const file = formData.get("file");

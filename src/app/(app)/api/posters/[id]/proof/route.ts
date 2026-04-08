@@ -1,4 +1,5 @@
 import {
+  isSameOriginRequest,
   jsonError,
   parseProofLocationFromFormData,
   posterErrorResponse,
@@ -11,6 +12,10 @@ export const runtime = "nodejs";
 
 export async function POST(request: Request, context: RouteContext<"/api/posters/[id]/proof">) {
   try {
+    if (!isSameOriginRequest(request)) {
+      return Response.json({ error: "forbidden" }, { status: 403 });
+    }
+
     const session = await requirePosterSession();
     const { id } = await context.params;
     const formData = await request.formData();
