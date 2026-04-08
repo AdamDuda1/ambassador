@@ -60,6 +60,7 @@
     "purgecss": "^8.0.0",
     "stylelint": "^17.6.0",
     "stylelint-config-standard": "^40.0.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "yaml-eslint-parser": "^2.0.0"
   }
 }
