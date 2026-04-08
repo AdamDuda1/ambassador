@@ -12,8 +12,8 @@ export default function PastEvents() {
 
   return (
     <div className="p-12">
-      <h2 className="text-5xl font-jersey">{t("title")}</h2>
-      <div className="leading-relaxed text-3xl text-pretty space-y-4 mt-4">
+      <h2 className="text-4xl md:text-5xl font-jersey">{t("title")}</h2>
+      <div className="leading-relaxed text-2xl md:text-3xl text-pretty space-y-4 mt-4">
         <p>
           {t.rich("0", {
             strong: (chunks) => <strong>{chunks}</strong>,
@@ -25,7 +25,7 @@ export default function PastEvents() {
           })}
         </p>
       </div>
-      <div className="mt-8 columns-2 gap-8 space-y-12 *:break-inside-avoid">
+      <div className="mt-8 lg:columns-2 gap-8 space-y-12 *:break-inside-avoid">
         <section>
           <Image
             src={campfireFlagship}

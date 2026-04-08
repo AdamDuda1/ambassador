@@ -15,8 +15,8 @@ export default function PastProjects() {
 
   return (
     <div className="p-12">
-      <h2 className="text-5xl font-jersey">{t("title")}</h2>
-      <div className="mt-8 gap-6 relative text-black grid grid-cols-3">
+      <h2 className="text-4xl md:text-5xl font-jersey">{t("title")}</h2>
+      <div className="mt-8 gap-6 relative text-black grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
         <div className="relative @container">
           <Image
             src={doomPdf}

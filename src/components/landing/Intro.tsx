@@ -19,7 +19,7 @@ export default function Intro() {
       <p className="text-neutral-500 text-xl font-jersey">
         --- START OF MESSAGE ---
       </p>
-      <div className="leading-relaxed text-3xl text-pretty space-y-4 mt-4">
+      <div className="leading-relaxed text-2xl md:text-3xl text-pretty space-y-4 mt-4">
         {keys.map((key) => (
           <p key={key}>
             {t.rich(`intro.${key}`, {

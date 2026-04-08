@@ -27,13 +27,15 @@ export default function Footer() {
         >
           <span className="font-jersey text-7xl uppercase">{t("apply")}</span>
         </Link>
-        <p className="mt-6 italic text-neutral-400">{t("footer.cta-sub")}</p>
+        <p className="mt-6 italic text-neutral-400 text-pretty">
+          {t("footer.cta-sub")}
+        </p>
       </div>
-      <div className="px-12 pb-6 flex items-center">
+      <div className="px-12 pb-6 gap-4 flex items-center">
         <a href="https://hackclub.com" target="_blank" rel="noreferrer">
           <Image src={hcRounded} alt="Hack Club" className="h-8 w-auto" />
         </a>
-        <p className="flex-1 text-right text-xs text-neutral-500">
+        <p className="flex-1 text-pretty text-right text-xs text-neutral-500">
           {t("footer.copyright")}
         </p>
       </div>

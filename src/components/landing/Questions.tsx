@@ -4,7 +4,9 @@ export default function Questions() {
   return (
     <div className="p-12 relative">
       <Sep className="absolute top-0 -translate-y-1/2 inset-x-0" />
-      <h2 className="text-5xl font-jersey">Questions you might have</h2>
+      <h2 className="text-4xl md:text-5xl font-jersey">
+        Questions you might have
+      </h2>
       <div className="mt-6 border-t border-neutral-300">
         <div className="py-4 border-b border-neutral-300 leading-relaxed text-xl">
           <p className="font-bold">What would I do?</p>
@@ -59,7 +61,7 @@ export default function Questions() {
           </p>
         </div>
       </div>
-      <p className="mt-6 text-3xl leading-relaxed">
+      <p className="mt-6 text-2xl md:text-3xl leading-relaxed">
         If your question isn&rsquo;t answered here, you can always ask in{" "}
         <strong>#ambassadors-program</strong> or email us,{" "}
         <strong>ambassadors@hackclub.com</strong>.
