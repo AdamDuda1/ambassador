@@ -25,10 +25,6 @@ app:
     settings-label: Settings
     sign-out-label: Sign out
 
-landing:
-  metadata:
-    title: Ambassador Program
-
 dev-admin-selector:
   label: dev/admin selector
   states:
@@ -524,6 +520,9 @@ admin:
       empty: No orders on file.
 
 landing:
+  metadata:
+    title: Ambassador Program
+
   apply: Apply
   apply-sub: "{daysLeft} days left, US, UK, CA, EU, AU only"
   log-in: Log in
