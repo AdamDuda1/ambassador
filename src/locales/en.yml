@@ -557,6 +557,8 @@ admin:
         description: Recent order records tied to this account.
     actions:
       current-review-target: Current review target
+      make-admin: Make admin
+      make-admin-confirmation: Are you sure you want to make this user an admin?
       bypass-approval: Bypass approval
       reject-note-label: Reject note
       reject-note-placeholder: Why this user should be rejected

@@ -213,6 +213,20 @@ export default async function AdminUserDetailPage({
           {t("app.navbar.refresh-session")}
         </a>
 
+        {!user.is_admin ? (
+          <ConfirmSubmitForm
+            action={`/api/admin/users/${user.id}/make-admin`}
+            method="POST"
+            className="max-w-xl"
+            confirmationMessage={t("admin.user-detail.actions.make-admin-confirmation")}
+          >
+            <input type="hidden" name="redirectTo" value={`/admin/users/${user.id}`} />
+            <button className={buttonVariants({ variant: "success", size: "app" })}>
+              {t("admin.user-detail.actions.make-admin")}
+            </button>
+          </ConfirmSubmitForm>
+        ) : null}
+
         {latestApplication ? (
           <div className="space-y-6">
             <div className="pb-2">
