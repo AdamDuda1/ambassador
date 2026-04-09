@@ -3,28 +3,21 @@ import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 
 import { Navbar } from "@/components/navbar";
-import { getTranslatedPageMetadata } from "@/i18n/metadata";
-import {
-  isAcceptedApplicationStatus,
-} from "@/lib/applications/status";
+import { isAcceptedApplicationStatus } from "@/lib/applications/status";
 import sql from "@/lib/database/client";
 import { ensureSchema } from "@/lib/database/ensure-schema";
 import { getSession } from "@/lib/session";
-import {
-  buildWarehouseTrackingUrl,
-  ORDER_STATUS_APPROVED,
-  ORDER_STATUS_PENDING,
-  ORDER_STATUS_REJECTED,
-} from "@/lib/shop";
+import { buildWarehouseTrackingUrl, SHIRT_SKU_PREFIX } from "@/lib/shop";
 import { normalizeHackClubAddresses } from "@/lib/settings";
 
-import ShopClient, { type ShopOrderState } from "./ShopClient";
+import ShirtClient, { type ShirtOrderState } from "./ShirtClient";
 
 type UserRow = {
   balance_cents: number | null;
   is_admin: boolean | null;
   hca_addresses: unknown;
   selected_address_index: number | null;
+  shirt_enabled: boolean | null;
 };
 
 type ApplicationRow = {
@@ -40,19 +33,19 @@ type OrderRow = {
 };
 
 export async function generateMetadata(): Promise<Metadata> {
-  return getTranslatedPageMetadata("shop.metadata.title");
+  return { title: (await getTranslations("shirt"))("metadata.title") };
 }
 
-export default async function ShopPage() {
+export default async function ShirtPage() {
   const session = await getSession();
   if (!session) redirect("/");
 
   await ensureSchema();
-  const t = await getTranslations();
+  const t = await getTranslations("shirt");
 
   const [[user], [latestApp], [existingOrderRow]] = await Promise.all([
     sql<UserRow[]>`
-      SELECT balance_cents, is_admin, hca_addresses, selected_address_index
+      SELECT balance_cents, is_admin, hca_addresses, selected_address_index, shirt_enabled
       FROM users
       WHERE id = ${session.sub}
       LIMIT 1
@@ -61,14 +54,14 @@ export default async function ShopPage() {
       SELECT status
       FROM applications
       WHERE user_id = ${session.sub}
-      ORDER BY created_at DESC
+      ORDER BY created_at DESC, id DESC
       LIMIT 1
     `,
     sql<OrderRow[]>`
       SELECT id, status, variant, warehouse_order_id, rejection_note
       FROM orders
-      WHERE user_id = ${session.sub} AND sku LIKE 'Swa/Shirt/HC/%'
-      ORDER BY created_at DESC
+      WHERE user_id = ${session.sub} AND sku LIKE ${`${SHIRT_SKU_PREFIX}%`}
+      ORDER BY created_at DESC, id DESC
       LIMIT 1
     `,
   ]);
@@ -80,7 +73,7 @@ export default async function ShopPage() {
     (user?.selected_address_index ?? 0) >= 0
       ? Math.min(user?.selected_address_index ?? 0, addresses.length - 1)
       : 0;
-  const existingOrder: ShopOrderState | null = existingOrderRow
+  const existingOrder: ShirtOrderState | null = existingOrderRow
     ? {
         id: existingOrderRow.id,
         status: existingOrderRow.status,
@@ -95,26 +88,27 @@ export default async function ShopPage() {
 
   return (
     <main className="page-shell">
-      <Navbar isAdmin={Boolean(user?.is_admin)} balanceCents={user?.balance_cents ?? 0} />
+      <Navbar
+        isAdmin={Boolean(user?.is_admin)}
+        balanceCents={user?.balance_cents ?? 0}
+        showBottomBorder={false}
+      />
       <div className="mx-auto max-w-2xl px-6 py-12">
         <header>
-          <h1 className="text-4xl text-white">{t("shop.heading")}</h1>
-          <p className="mt-2 text-base text-muted-foreground">{t("shop.subheading")}</p>
+          <h1 className="text-4xl text-white">{t("heading")}</h1>
+          <p className="mt-2 text-base text-muted-foreground">{t("subheading")}</p>
         </header>
 
-        {isAmbassador ? (
-          <ShopClient
+        {!user?.shirt_enabled ? (
+          <p className="mt-8 font-body text-base text-white">{t("unavailable")}</p>
+        ) : isAmbassador ? (
+          <ShirtClient
             addresses={addresses}
             selectedAddressIndex={selectedAddressIndex}
             existingOrder={existingOrder}
-            statusKeys={{
-              pending: ORDER_STATUS_PENDING,
-              approved: ORDER_STATUS_APPROVED,
-              rejected: ORDER_STATUS_REJECTED,
-            }}
           />
         ) : (
-          <p className="mt-8 font-body text-base text-white">{t("shop.not-ambassador")}</p>
+          <p className="mt-8 font-body text-base text-white">{t("not-ambassador")}</p>
         )}
       </div>
     </main>

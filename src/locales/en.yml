@@ -22,7 +22,7 @@ app:
     logo-alt: Ambassador
     admin-link: Admin
     posters-link: Posters
-    shop-link: Shop
+    shirt-link: Shirt
     refresh-session: Refresh session
     settings-label: Settings
     sign-out-label: Sign out
@@ -155,14 +155,15 @@ posters:
     geolocation-unavailable: Your browser does not support geolocation.
     geolocation-denied: Precise location access was denied. Please enable it in your browser settings.
 
-shop:
+shirt:
   metadata:
-    title: Shop
-  heading: Shop
+    title: Shirt
+  heading: Shirt
   subheading: Free Hack Club merch for ambassadors.
-  not-ambassador: The shop is only available to approved ambassadors.
+  unavailable: Shirt ordering is not enabled for this account yet.
+  not-ambassador: The shirt page is only available to approved ambassadors.
   manage-addresses: Manage addresses on Hack Club Auth
-  shirt:
+  product:
     title: Hack Club Ambassador shirt
     subtitle: Pick a size and we'll ship it to you, on us.
   labels:
@@ -180,11 +181,16 @@ shop:
     approved-title: Order approved
     approved-body: "Your size {size} shirt has been sent to the warehouse. Track shipping below."
     rejected-title: Order rejected
-    rejected-body: We couldn't fulfil this order. Reach out if you think this is a mistake.
+    rejected-body: We couldn't fulfil this order. You can place a new shirt order below.
+    failed-title: Order failed
+    failed-body: We couldn't send this order through. You can place a new shirt order below.
+    cancelled-title: Order cancelled
+    cancelled-body: This order was cancelled. You can place a new shirt order below.
     track-cta: Track on mail.hackclub.com
   errors:
     generic: Something went wrong.
-    not-ambassador: Only approved ambassadors can order from the shop.
+    not-ambassador: Only approved ambassadors can order a shirt.
+    unavailable: Shirt ordering is not enabled for this account.
     no-address: You need a shipping address on Hack Club Auth first.
     already-ordered: You've already ordered an ambassador shirt.
     invalid-size: Pick a valid size.
@@ -520,6 +526,7 @@ admin:
       no-review-target: This user does not have any applications yet, so there is no review target to update.
     flags:
       posters-enabled: Enable posters page
+      shirt-enabled: Enable shirt page
     profile-fields:
       display-name: Display name
       first-name: First name
@@ -541,6 +548,7 @@ admin:
       last-seen-ip: Last seen IP
       admin: Admin
       posters-enabled: Posters enabled
+      shirt-enabled: Shirt enabled
       created: Created
       updated: Updated
     applications:

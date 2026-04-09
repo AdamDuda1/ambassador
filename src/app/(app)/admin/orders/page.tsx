@@ -8,6 +8,7 @@ import { ensureSchema } from "@/lib/database/ensure-schema";
 import {
   buildWarehouseTrackingUrl,
   ORDER_STATUS_APPROVED,
+  ORDER_STATUS_CANCELLED,
   ORDER_STATUS_FAILED,
   ORDER_STATUS_PENDING,
   ORDER_STATUS_REJECTED,
@@ -183,7 +184,9 @@ function OrderStatusBadge({ status }: { status: string }) {
   const tone =
     status === ORDER_STATUS_APPROVED
       ? "green"
-      : status === ORDER_STATUS_REJECTED || status === ORDER_STATUS_FAILED
+      : status === ORDER_STATUS_REJECTED ||
+          status === ORDER_STATUS_FAILED ||
+          status === ORDER_STATUS_CANCELLED
         ? "red"
         : "black";
 

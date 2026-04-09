@@ -1,18 +1,16 @@
+import { isAcceptedApplicationStatus } from "@/lib/applications/status";
 import sql from "@/lib/database/client";
 import { ensureSchema } from "@/lib/database/ensure-schema";
 import { isSameOriginRequest } from "@/lib/http";
 import { getSession } from "@/lib/session";
 import {
+  canPlaceAnotherShirtOrder,
   isShirtSize,
   ORDER_STATUS_PENDING,
+  SHIRT_SKU_PREFIX,
   shirtSku,
 } from "@/lib/shop";
-import {
-  isAcceptedApplicationStatus,
-} from "@/lib/applications/status";
-import {
-  normalizeHackClubAddresses,
-} from "@/lib/settings";
+import { normalizeHackClubAddresses } from "@/lib/settings";
 
 export async function POST(request: Request) {
   if (!isSameOriginRequest(request)) {
@@ -36,18 +34,23 @@ export async function POST(request: Request) {
   }
 
   const [user] = await sql`
-    SELECT id, hca_addresses, selected_address_index
+    SELECT id, hca_addresses, selected_address_index, shirt_enabled
     FROM users
     WHERE id = ${session.sub}
   `;
   if (!user) {
     return Response.json({ error: "unauthorized" }, { status: 401 });
   }
+  if (!user.shirt_enabled) {
+    return Response.json({ error: "shirt_unavailable" }, { status: 403 });
+  }
 
   const [latestApp] = await sql`
-    SELECT status FROM applications
+    SELECT status
+    FROM applications
     WHERE user_id = ${session.sub}
-    ORDER BY created_at DESC LIMIT 1
+    ORDER BY created_at DESC, id DESC
+    LIMIT 1
   `;
   if (!latestApp || !isAcceptedApplicationStatus(latestApp.status)) {
     return Response.json({ error: "not_ambassador" }, { status: 403 });
@@ -67,12 +70,14 @@ export async function POST(request: Request) {
   const addressIndex = Math.min(Math.max(requestedIndex, 0), addresses.length - 1);
   const address = addresses[addressIndex];
 
-  const [existing] = await sql`
-    SELECT id FROM orders
-    WHERE user_id = ${session.sub} AND sku LIKE 'Swa/Shirt/HC/%'
+  const [latestOrder] = await sql`
+    SELECT id, status
+    FROM orders
+    WHERE user_id = ${session.sub} AND sku LIKE ${`${SHIRT_SKU_PREFIX}%`}
+    ORDER BY created_at DESC, id DESC
     LIMIT 1
   `;
-  if (existing) {
+  if (latestOrder && !canPlaceAnotherShirtOrder(latestOrder.status)) {
     return Response.json({ error: "already_ordered" }, { status: 409 });
   }
 

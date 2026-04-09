@@ -31,7 +31,10 @@ export function isSameOriginRequest(request: Request) {
     toOrigin(request.headers.get("origin")) ??
     toOrigin(request.headers.get("referer"));
 
-  if (!requestOrigin) return false;
+  if (!requestOrigin) {
+    const fetchSite = request.headers.get("sec-fetch-site");
+    return fetchSite === "same-origin" || fetchSite === "same-site" || fetchSite === "none";
+  }
 
   return requestOrigin === new URL(request.url).origin;
 }

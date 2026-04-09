@@ -26,10 +26,13 @@ export async function POST(
   const { id } = await params;
   const formData = await request.formData();
   const postersEnabled = formData.has("postersEnabled");
+  const shirtEnabled = formData.has("shirtEnabled");
 
   const [updatedUser] = await sql<{ id: string }[]>`
     UPDATE users
-    SET posters_enabled = ${postersEnabled}, updated_at = NOW()
+    SET posters_enabled = ${postersEnabled},
+        shirt_enabled = ${shirtEnabled},
+        updated_at = NOW()
     WHERE id = ${id}
     RETURNING id
   `;
@@ -40,6 +43,7 @@ export async function POST(
 
   revalidatePath(`/admin/users/${id}`);
   revalidatePath("/posters");
+  revalidatePath("/shirt");
 
   return Response.redirect(
     new URL(

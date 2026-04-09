@@ -6,16 +6,23 @@ import Icon from "@hackclub/icons";
 export async function Navbar({
   isAdmin = false,
   balanceCents = 0,
+  showBottomBorder = true,
 }: {
   isAdmin?: boolean;
   balanceCents?: number;
+  showBottomBorder?: boolean;
 }) {
   const t = await getTranslations();
 
   const dollars = (balanceCents / 100).toFixed(2);
 
   return (
-    <nav className="border-b border-foreground/10 bg-[var(--topbar)] px-6 py-4">
+    <nav
+      className={[
+        "bg-[var(--topbar)] px-6 py-4",
+        showBottomBorder ? "border-b border-foreground/10" : "",
+      ].join(" ")}
+    >
       <div className="mx-auto flex max-w-5xl items-center justify-between">
         <a href="/dashboard" className="flex items-center gap-3">
           <Image
@@ -45,10 +52,10 @@ export async function Navbar({
             {t("app.navbar.posters-link")}
           </a>
           <a
-            href="/shop"
+            href="/shirt"
             className="inline-flex h-9 items-center rounded-lg px-3 text-base tracking-wide text-white transition-opacity hover:opacity-70"
           >
-            {t("app.navbar.shop-link")}
+            {t("app.navbar.shirt-link")}
           </a>
           <a
             href="/settings"

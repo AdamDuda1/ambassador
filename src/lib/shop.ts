@@ -2,25 +2,28 @@ import type { HackClubAddress } from "@/lib/settings";
 
 export const SHIRT_SIZES = ["S", "M", "L", "XL"] as const;
 export type ShirtSize = (typeof SHIRT_SIZES)[number];
+export const SHIRT_SKU_PREFIX = "Swa/Shirt/HC/";
 
 export function isShirtSize(value: unknown): value is ShirtSize {
   return typeof value === "string" && (SHIRT_SIZES as readonly string[]).includes(value);
 }
 
 export function shirtSku(size: ShirtSize) {
-  return `Swa/Shirt/HC/${size}`;
+  return `${SHIRT_SKU_PREFIX}${size}`;
 }
 
 export const ORDER_STATUS_PENDING = "pending";
 export const ORDER_STATUS_APPROVED = "approved";
 export const ORDER_STATUS_REJECTED = "rejected";
 export const ORDER_STATUS_FAILED = "failed";
+export const ORDER_STATUS_CANCELLED = "cancelled";
 
 export type OrderStatus =
   | typeof ORDER_STATUS_PENDING
   | typeof ORDER_STATUS_APPROVED
   | typeof ORDER_STATUS_REJECTED
-  | typeof ORDER_STATUS_FAILED;
+  | typeof ORDER_STATUS_FAILED
+  | typeof ORDER_STATUS_CANCELLED;
 
 export type ShopOrderRow = {
   id: string;
@@ -41,4 +44,12 @@ export type ShopOrderRow = {
 
 export function buildWarehouseTrackingUrl(warehouseOrderId: string) {
   return `https://mail.hackclub.com/warehouse_orders/${encodeURIComponent(warehouseOrderId)}`;
+}
+
+export function canPlaceAnotherShirtOrder(status: string | null | undefined) {
+  return (
+    status === ORDER_STATUS_REJECTED ||
+    status === ORDER_STATUS_FAILED ||
+    status === ORDER_STATUS_CANCELLED
+  );
 }

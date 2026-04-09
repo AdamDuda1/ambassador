@@ -53,7 +53,7 @@ export default async function AdminUserDetailPage({
            hca_locality, hca_region, hca_postal_code, hca_country, slack_id, slack_name,
            slack_avatar_url, verification_status, is_admin, last_ip, latitude, longitude, city,
            region, country_code, country_name, postal_code, timezone, org, hca_addresses,
-           posters_enabled,
+           posters_enabled, shirt_enabled,
            permanently_rejected_at, permanent_rejection_note, created_at, updated_at
     FROM users
     WHERE id = ${id}
@@ -285,6 +285,18 @@ export default async function AdminUserDetailPage({
               {t("admin.user-detail.flags.posters-enabled")}
             </span>
           </label>
+          <label className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              name="shirtEnabled"
+              value="true"
+              defaultChecked={Boolean(user.shirt_enabled)}
+              className="h-4 w-4 accent-primary"
+            />
+            <span className="font-body text-sm text-white">
+              {t("admin.user-detail.flags.shirt-enabled")}
+            </span>
+          </label>
           <button className={buttonVariants({ size: "app" })}>
             {t("admin.user-detail.actions.save-flags")}
           </button>
@@ -332,6 +344,7 @@ export default async function AdminUserDetailPage({
         <DetailFieldRow label={t("admin.user-detail.profile-fields.last-seen-ip")} value={user.last_ip} mono />
         <DetailFieldRow label={t("admin.user-detail.profile-fields.admin")} value={user.is_admin ? t("common.yes") : t("common.no")} />
         <DetailFieldRow label={t("admin.user-detail.profile-fields.posters-enabled")} value={user.posters_enabled ? t("common.yes") : t("common.no")} />
+        <DetailFieldRow label={t("admin.user-detail.profile-fields.shirt-enabled")} value={user.shirt_enabled ? t("common.yes") : t("common.no")} />
         <DetailFieldRow label={t("admin.user-detail.profile-fields.created")} value={formatDateTime(user.created_at, locale)} />
         <DetailFieldRow label={t("admin.user-detail.profile-fields.updated")} value={formatDateTime(user.updated_at, locale)} />
       </DetailSection>
