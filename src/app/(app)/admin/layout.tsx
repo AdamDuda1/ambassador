@@ -3,14 +3,14 @@ import { forbidden, unauthorized } from "next/navigation";
 import { AdminTabs } from "@/components/admin/admin-tabs";
 import { Navbar } from "@/components/navbar";
 import sql from "@/lib/database/client";
-import { getSession } from "@/lib/session";
+import { getActorSession } from "@/lib/session";
 
 export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const session = await getSession();
+  const session = await getActorSession();
   if (!session) unauthorized();
 
   const [user] = await sql`

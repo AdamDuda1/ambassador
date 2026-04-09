@@ -4,7 +4,7 @@ import { isUserAdmin } from "@/lib/applications/review";
 import sql from "@/lib/database/client";
 import { ensureSchema } from "@/lib/database/ensure-schema";
 import { getSafeRedirectUrl, isSameOriginRequest } from "@/lib/http";
-import { getSession } from "@/lib/session";
+import { getActorSession } from "@/lib/session";
 
 export async function POST(
   request: Request,
@@ -14,7 +14,7 @@ export async function POST(
     return Response.json({ error: "forbidden" }, { status: 403 });
   }
 
-  const session = await getSession();
+  const session = await getActorSession();
   if (!session) {
     return Response.json({ error: "forbidden" }, { status: 403 });
   }

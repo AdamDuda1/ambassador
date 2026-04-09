@@ -1,9 +1,11 @@
-import { SignJWT, jwtVerify } from "jose";
+import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 import { cookies } from "next/headers";
 
 import { isProduction, requireEnv } from "@/lib/env";
 
 const COOKIE_NAME = "ambassador_token";
+const IMPERSONATION_COOKIE_NAME = "ambassador_impersonation";
+const IMPERSONATION_COOKIE_MAX_AGE_SECONDS = 43200;
 const SECRET = new TextEncoder().encode(requireEnv("JWT_SECRET"));
 
 export type TokenPayload = {
@@ -14,21 +16,76 @@ export type TokenPayload = {
   isAdmin: boolean;
 };
 
-export async function createToken(payload: TokenPayload): Promise<string> {
-  return new SignJWT(payload)
+type ImpersonationTokenPayload = {
+  type: "impersonation";
+  actor: TokenPayload;
+  subject: TokenPayload;
+  startedAt: string;
+};
+
+export type SessionPayload = TokenPayload & {
+  impersonator?: TokenPayload;
+  impersonationStartedAt?: string;
+};
+
+async function signToken(payload: Record<string, unknown>): Promise<string> {
+  return signTokenWithExpiry(payload, "30d");
+}
+
+async function signTokenWithExpiry(
+  payload: Record<string, unknown>,
+  expirationTime: string,
+): Promise<string> {
+  return new SignJWT(payload as JWTPayload)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("30d")
+    .setExpirationTime(expirationTime)
     .sign(SECRET);
 }
 
-export async function verifyToken(token: string): Promise<TokenPayload | null> {
+async function verifyJwt<T>(token: string): Promise<T | null> {
   try {
     const { payload } = await jwtVerify(token, SECRET);
-    return payload as TokenPayload;
+    return payload as T;
   } catch {
     return null;
   }
+}
+
+export async function createToken(payload: TokenPayload): Promise<string> {
+  return signToken(payload);
+}
+
+export async function verifyToken(token: string): Promise<TokenPayload | null> {
+  return verifyJwt<TokenPayload>(token);
+}
+
+export async function createImpersonationToken(payload: {
+  actor: TokenPayload;
+  subject: TokenPayload;
+  startedAt: string;
+}): Promise<string> {
+  return signTokenWithExpiry(
+    {
+      type: "impersonation",
+      actor: payload.actor,
+      subject: payload.subject,
+      startedAt: payload.startedAt,
+    },
+    "12h",
+  );
+}
+
+export async function verifyImpersonationToken(
+  token: string,
+): Promise<ImpersonationTokenPayload | null> {
+  const payload = await verifyJwt<ImpersonationTokenPayload>(token);
+
+  if (!payload || payload.type !== "impersonation") {
+    return null;
+  }
+
+  return payload;
 }
 
 export async function setSession(token: string) {
@@ -42,14 +99,60 @@ export async function setSession(token: string) {
   });
 }
 
-export async function getSession(): Promise<TokenPayload | null> {
+export async function setImpersonationSession(token: string) {
+  const cookieStore = await cookies();
+  cookieStore.set(IMPERSONATION_COOKIE_NAME, token, {
+    httpOnly: true,
+    secure: isProduction(),
+    sameSite: "lax",
+    path: "/",
+    maxAge: IMPERSONATION_COOKIE_MAX_AGE_SECONDS,
+  });
+}
+
+export async function getActorSession(): Promise<TokenPayload | null> {
   const cookieStore = await cookies();
   const cookie = cookieStore.get(COOKIE_NAME);
   if (!cookie) return null;
   return verifyToken(cookie.value);
 }
 
+export async function getSession(): Promise<SessionPayload | null> {
+  const cookieStore = await cookies();
+  const actorCookie = cookieStore.get(COOKIE_NAME);
+  if (!actorCookie) return null;
+
+  const actorSession = await verifyToken(actorCookie.value);
+  if (!actorSession) return null;
+
+  const impersonationCookie = cookieStore.get(IMPERSONATION_COOKIE_NAME);
+  if (!impersonationCookie) {
+    return actorSession;
+  }
+
+  const impersonation = await verifyImpersonationToken(impersonationCookie.value);
+  if (!impersonation) {
+    return actorSession;
+  }
+
+  if (!actorSession.isAdmin || impersonation.actor.sub !== actorSession.sub) {
+    return actorSession;
+  }
+
+  return {
+    ...impersonation.subject,
+    impersonator: actorSession,
+    impersonationStartedAt: impersonation.startedAt,
+  };
+}
+
+export async function clearImpersonationSession() {
+  const cookieStore = await cookies();
+  cookieStore.delete(IMPERSONATION_COOKIE_NAME);
+}
+
 export async function clearSession() {
   const cookieStore = await cookies();
   cookieStore.delete(COOKIE_NAME);
+  cookieStore.delete(IMPERSONATION_COOKIE_NAME);
 }

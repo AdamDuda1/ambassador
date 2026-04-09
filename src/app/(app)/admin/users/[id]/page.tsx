@@ -27,6 +27,7 @@ import {
   getUserManualDashboardStateLabel,
   isUserManualDashboardState,
 } from "@/lib/user-dashboard-state";
+import { getActorSession } from "@/lib/session";
 import type { HackClubAddress } from "@/lib/settings";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -40,11 +41,12 @@ export default async function AdminUserDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ visitsPage?: string }>;
 }) {
-  const [{ id }, query, t, locale] = await Promise.all([
+  const [{ id }, query, t, locale, actorSession] = await Promise.all([
     params,
     searchParams,
     getTranslations(),
     getLocale(),
+    getActorSession(),
   ]);
   const requestedVisitsPage = Number(query.visitsPage ?? "1");
   const visitsPage = Number.isFinite(requestedVisitsPage) && requestedVisitsPage > 0
@@ -155,6 +157,7 @@ export default async function AdminUserDetailPage({
     !manualDashboardState &&
     !!latestApplication &&
     !shouldShowPermanentRejectionLabel;
+  const canImpersonateUser = Boolean(actorSession && actorSession.sub !== user.id);
 
   return (
     <div className="space-y-10">
@@ -218,12 +221,14 @@ export default async function AdminUserDetailPage({
         title={t("admin.user-detail.sections.user-actions.title")}
         description={t("admin.user-detail.sections.user-actions.description")}
       >
-        <a
-          href={`/api/auth/refresh?next=${encodeURIComponent(`/admin/users/${user.id}`)}`}
-          className={buttonVariants({ size: "app" })}
-        >
-          {t("app.navbar.refresh-session")}
-        </a>
+        {canImpersonateUser ? (
+          <form action={`/api/admin/users/${user.id}/impersonate`} method="POST">
+            <input type="hidden" name="redirectTo" value="/dashboard" />
+            <button className={buttonVariants({ size: "app" })}>
+              {t("admin.user-detail.actions.impersonate")}
+            </button>
+          </form>
+        ) : null}
 
         {!user.is_admin ? (
           <ConfirmSubmitForm

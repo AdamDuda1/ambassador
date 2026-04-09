@@ -22,9 +22,14 @@ app:
     logo-alt: Ambassador
     admin-link: Admin
     posters-link: Posters
-    refresh-session: Refresh session
     settings-label: Settings
     sign-out-label: Sign out
+  impersonation:
+    label: impersonating
+    active: "{name}"
+    stop: Stop
+    stopping: Stopping...
+    stop-error: Could not stop
 
 dev-admin-selector:
   label: dev/admin selector
@@ -569,6 +574,7 @@ admin:
         description: Recent order records tied to this account.
     actions:
       current-review-target: Current review target
+      impersonate: Impersonate user
       make-admin: Make admin
       make-admin-confirmation: Are you sure you want to make this user an admin?
       bypass-approval: Bypass approval

@@ -28,10 +28,11 @@ export default async function SettingsPage() {
       balance_cents, is_admin, country_name
     FROM users WHERE id = ${session.sub}
   `;
+  const canAccessAdmin = Boolean(session.impersonator) || Boolean(user?.is_admin ?? session.isAdmin);
 
   return (
     <main className="page-shell">
-      <Navbar isAdmin={Boolean(user?.is_admin)} balanceCents={user?.balance_cents ?? 0} />
+      <Navbar isAdmin={canAccessAdmin} balanceCents={user?.balance_cents ?? 0} />
       <div className="mx-auto max-w-2xl px-6 py-12">
         <h1 className="text-4xl text-white">{t("settings.heading")}</h1>
         <hr className="mt-6 border-white/10" />

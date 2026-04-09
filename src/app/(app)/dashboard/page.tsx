@@ -184,13 +184,14 @@ export default async function DashboardPage({
   const resolved = isDevelopmentEnvironment && selectedDevState
     ? resolveState({ ...stateInput, activeDevState: selectedDevState })
     : baseResolved;
-  const canUseSelector = canShowDevAdminSelector(Boolean(user?.is_admin ?? session.isAdmin));
+  const canAccessAdmin = Boolean(session.impersonator) || Boolean(user?.is_admin ?? session.isAdmin);
+  const canUseSelector = canShowDevAdminSelector(canAccessAdmin);
   const devSwitcherCurrent = selectedDevState ?? baseResolved.devState;
   const showAmbassadorRing = resolved.decision === "approved";
 
   return (
     <main className="page-shell">
-      <Navbar isAdmin={Boolean(user?.is_admin)} balanceCents={user?.balance_cents ?? 0} />
+      <Navbar isAdmin={canAccessAdmin} balanceCents={user?.balance_cents ?? 0} />
       <div className="mx-auto max-w-3xl px-6 py-12">
         <header className="flex items-center gap-2 md:gap-3">
           <h1 className="font-sub text-4xl leading-none text-white md:text-5xl">

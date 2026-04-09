@@ -32,11 +32,12 @@ export default async function PostersPage() {
     WHERE id = ${session.sub}
     LIMIT 1
   `;
+  const canAccessAdmin = Boolean(session.impersonator) || Boolean(user?.is_admin ?? session.isAdmin);
 
   if (!user?.posters_enabled) {
     return (
       <main className="page-shell">
-        <Navbar isAdmin={Boolean(user?.is_admin)} balanceCents={user?.balance_cents ?? 0} />
+        <Navbar isAdmin={canAccessAdmin} balanceCents={user?.balance_cents ?? 0} />
         <div className="mx-auto max-w-5xl px-6 py-12">
           <h1 className="text-4xl text-white">{t("posters.unavailable")}</h1>
         </div>
@@ -50,7 +51,7 @@ export default async function PostersPage() {
 
   return (
     <main className="page-shell">
-      <Navbar isAdmin={Boolean(user?.is_admin)} balanceCents={user?.balance_cents ?? 0} />
+      <Navbar isAdmin={canAccessAdmin} balanceCents={user?.balance_cents ?? 0} />
       <div className="mx-auto max-w-5xl px-6 py-12">
         <header className="mb-10">
           <h1 className="text-4xl text-white">{t("posters.heading")}</h1>
