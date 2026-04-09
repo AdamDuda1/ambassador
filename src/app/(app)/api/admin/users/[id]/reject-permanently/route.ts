@@ -4,7 +4,7 @@ import {
   isUserAdmin,
   reviewLatestApplicationForUser,
 } from "@/lib/applications/review";
-import { getSafeRedirectPath, isSameOriginRequest } from "@/lib/http";
+import { getSafeRedirectUrl, isSameOriginRequest } from "@/lib/http";
 import { APPLICATION_STATUS_REJECTED_PERMANENT } from "@/lib/applications/status";
 import { ensureSchema } from "@/lib/database/ensure-schema";
 import { getSession } from "@/lib/session";
@@ -50,10 +50,5 @@ export async function POST(
     throw error;
   }
 
-  return Response.redirect(
-    new URL(
-      getSafeRedirectPath(formData.get("redirectTo"), `/admin/users/${id}`),
-      request.url,
-    ),
-  );
+  return Response.redirect(getSafeRedirectUrl(request, formData.get("redirectTo"), `/admin/users/${id}`));
 }

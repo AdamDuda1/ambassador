@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { isUserAdmin } from "@/lib/applications/review";
 import sql from "@/lib/database/client";
 import { ensureSchema } from "@/lib/database/ensure-schema";
-import { getSafeRedirectPath, isSameOriginRequest } from "@/lib/http";
+import { getSafeRedirectUrl, isSameOriginRequest } from "@/lib/http";
 import { getSession } from "@/lib/session";
 import { isUserManualDashboardState } from "@/lib/user-dashboard-state";
 
@@ -50,10 +50,5 @@ export async function POST(
   revalidatePath(`/admin/users/${id}`);
   revalidatePath("/dashboard");
 
-  return Response.redirect(
-    new URL(
-      getSafeRedirectPath(formData.get("redirectTo"), `/admin/users/${id}`),
-      request.url,
-    ),
-  );
+  return Response.redirect(getSafeRedirectUrl(request, formData.get("redirectTo"), `/admin/users/${id}`));
 }

@@ -1,6 +1,6 @@
 import { isUserAdmin, setApplicationTshirtShipped } from "@/lib/applications/review";
 import { ensureSchema } from "@/lib/database/ensure-schema";
-import { getSafeRedirectPath, isSameOriginRequest } from "@/lib/http";
+import { getSafeRedirectUrl, isSameOriginRequest } from "@/lib/http";
 import { getSession } from "@/lib/session";
 
 export async function POST(
@@ -33,9 +33,6 @@ export async function POST(
   }
 
   return Response.redirect(
-    new URL(
-      getSafeRedirectPath(formData.get("redirectTo"), `/admin/applications/${id}`),
-      request.url,
-    ),
+    getSafeRedirectUrl(request, formData.get("redirectTo"), `/admin/applications/${id}`),
   );
 }

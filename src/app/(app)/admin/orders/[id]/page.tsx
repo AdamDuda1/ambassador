@@ -1,4 +1,3 @@
-import Icon from "@hackclub/icons";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { getLocale, getTranslations } from "next-intl/server";
@@ -23,6 +22,7 @@ import {
   ORDER_STATUS_FAILED,
   ORDER_STATUS_REJECTED,
 } from "@/lib/shop";
+import { parseWarehouseOrderResponse } from "@/lib/warehouse";
 
 export async function generateMetadata(): Promise<Metadata> {
   return getTranslatedPageMetadata("admin.order-detail.page-title");
@@ -164,7 +164,7 @@ export default async function AdminOrderDetailPage({
             >
               <input type="hidden" name="redirectTo" value={redirectTo} />
               <button className={buttonVariants({ variant: "success", size: "app" })}>
-                {order.warehouse_order_id
+                {warehouseOrderId
                   ? t("admin.order-detail.actions.approve-existing")
                   : t("admin.order-detail.actions.approve")}
               </button>
@@ -283,7 +283,7 @@ export default async function AdminOrderDetailPage({
                 className={buttonVariants({ size: "app-sm" })}
               >
                 {t("admin.order-detail.actions.open-warehouse-order")}
-                <Icon glyph="external-fill" size={16} />
+                <span aria-hidden="true">↗</span>
               </a>
             ) : null}
             {publicOrderUrl ? (
@@ -294,7 +294,7 @@ export default async function AdminOrderDetailPage({
                 className={buttonVariants({ size: "app-sm" })}
               >
                 {t("admin.order-detail.actions.open-public-order")}
-                <Icon glyph="external-fill" size={16} />
+                <span aria-hidden="true">↗</span>
               </a>
             ) : null}
           </div>
@@ -343,50 +343,6 @@ function OrderStatusBadge({ status }: { status: string }) {
   return <span className={pillVariants({ tone })}>{status}</span>;
 }
 
-type WarehouseOrderPayload = {
-  id?: string;
-  status?: string;
-  address?: HackClubAddress | null;
-  tags?: string[];
-  recipient_email?: string;
-  dispatched_at?: string;
-  mailed_at?: string;
-  tracking_number?: string;
-  carrier?: string;
-  service?: string;
-};
-
-function parseWarehouseOrderPayload(value: unknown): WarehouseOrderPayload | null {
-  if (typeof value === "string") {
-    try {
-      return parseWarehouseOrderPayload(JSON.parse(value) as unknown);
-    } catch {
-      return null;
-    }
-  }
-
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return null;
-  }
-
-  const payload = value as Record<string, unknown>;
-
-  return {
-    id: typeof payload.id === "string" ? payload.id : undefined,
-    status: typeof payload.status === "string" ? payload.status : undefined,
-    address:
-      payload.address && typeof payload.address === "object" ? (payload.address as HackClubAddress) : null,
-    tags: Array.isArray(payload.tags)
-      ? payload.tags.filter((tag): tag is string => typeof tag === "string")
-      : undefined,
-    recipient_email:
-      typeof payload.recipient_email === "string" ? payload.recipient_email : undefined,
-    dispatched_at:
-      typeof payload.dispatched_at === "string" ? payload.dispatched_at : undefined,
-    mailed_at: typeof payload.mailed_at === "string" ? payload.mailed_at : undefined,
-    tracking_number:
-      typeof payload.tracking_number === "string" ? payload.tracking_number : undefined,
-    carrier: typeof payload.carrier === "string" ? payload.carrier : undefined,
-    service: typeof payload.service === "string" ? payload.service : undefined,
-  };
+function parseWarehouseOrderPayload(value: unknown) {
+  return parseWarehouseOrderResponse(value);
 }

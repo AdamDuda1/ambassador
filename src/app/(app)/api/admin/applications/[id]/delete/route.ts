@@ -1,5 +1,5 @@
 import { isUserAdmin } from "@/lib/applications/review";
-import { getSafeRedirectPath, isSameOriginRequest } from "@/lib/http";
+import { getSafeRedirectUrl, isSameOriginRequest } from "@/lib/http";
 import { ensureSchema } from "@/lib/database/ensure-schema";
 import { getSession } from "@/lib/session";
 import sql from "@/lib/database/client";
@@ -36,9 +36,6 @@ export async function POST(
   }
 
   return Response.redirect(
-    new URL(
-      getSafeRedirectPath(formData.get("redirectTo"), "/admin/applications"),
-      request.url,
-    ),
+    getSafeRedirectUrl(request, formData.get("redirectTo"), "/admin/applications"),
   );
 }

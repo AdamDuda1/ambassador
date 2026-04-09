@@ -4,7 +4,7 @@ import {
   isUserAdmin,
   reviewApplication,
 } from "@/lib/applications/review";
-import { getSafeRedirectPath, isSameOriginRequest } from "@/lib/http";
+import { getSafeRedirectUrl, isSameOriginRequest } from "@/lib/http";
 import { APPLICATION_STATUS_ACCEPTED } from "@/lib/applications/status";
 import { ensureSchema } from "@/lib/database/ensure-schema";
 import { getSession } from "@/lib/session";
@@ -49,9 +49,6 @@ export async function POST(
   }
 
   return Response.redirect(
-    new URL(
-      getSafeRedirectPath(formData.get("redirectTo"), `/admin/applications/${target.id}`),
-      request.url,
-    ),
+    getSafeRedirectUrl(request, formData.get("redirectTo"), `/admin/applications/${target.id}`),
   );
 }

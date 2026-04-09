@@ -32,6 +32,7 @@ import {
 } from "@/lib/shop";
 import { isUserManualDashboardState } from "@/lib/user-dashboard-state";
 import { cn } from "@/lib/utils";
+import { parseWarehouseOrderResponse } from "@/lib/warehouse";
 
 import ShirtOrderSection, {
   type ShirtOrderSectionProps,
@@ -64,6 +65,7 @@ type ShirtOrderRow = {
   status: string;
   variant: string | null;
   warehouse_order_id: string | null;
+  warehouse_payload: unknown | null;
   note: string | null;
 };
 
@@ -97,7 +99,7 @@ export default async function DashboardPage({
       FROM users WHERE id = ${session.sub}
     `,
     sql<ShirtOrderRow[]>`
-      SELECT id, status, variant, warehouse_order_id, note
+      SELECT id, status, variant, warehouse_order_id, warehouse_payload, note
       FROM orders
       WHERE user_id = ${session.sub} AND sku LIKE ${`${SHIRT_SKU_PREFIX}%`}
       ORDER BY created_at DESC, id DESC
@@ -130,18 +132,26 @@ export default async function DashboardPage({
     }
   }
   const shirtExistingOrder: ShirtOrderState | null = existingOrderRow
-    ? {
-        id: existingOrderRow.id,
-        status: existingOrderRow.status,
-        size: existingOrderRow.variant,
-        warehouseUrl: existingOrderRow.warehouse_order_id
-          ? buildWarehouseTrackingUrl(existingOrderRow.warehouse_order_id)
-          : null,
-        publicOrderUrl: existingOrderRow.warehouse_order_id
-          ? buildWarehousePublicOrderUrl(existingOrderRow.warehouse_order_id)
-          : null,
-        note: existingOrderRow.note,
-      }
+    ? (() => {
+        const warehouseOrder = parseWarehouseOrderResponse(
+          existingOrderRow.warehouse_payload,
+        );
+        const warehouseOrderId =
+          existingOrderRow.warehouse_order_id ?? warehouseOrder?.id ?? null;
+
+        return {
+          id: existingOrderRow.id,
+          status: existingOrderRow.status,
+          size: existingOrderRow.variant,
+          warehouseUrl: warehouseOrderId
+            ? buildWarehouseTrackingUrl(warehouseOrderId)
+            : null,
+          publicOrderUrl: warehouseOrderId
+            ? buildWarehousePublicOrderUrl(warehouseOrderId)
+            : null,
+          note: existingOrderRow.note,
+        };
+      })()
     : null;
   const shirt: ShirtOrderSectionProps = {
     shirtEnabled: Boolean(

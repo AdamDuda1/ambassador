@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { getLocale, getTranslations } from "next-intl/server";
 
+import { SlackAvatar } from "@/components/admin/slack-profile";
 import { pillVariants } from "@/components/ui/pill";
 import { getTranslatedPageMetadata } from "@/i18n/metadata";
 import sql from "@/lib/database/client";
@@ -25,6 +26,8 @@ type OrderRow = {
   created_at: string;
   user_name: string | null;
   user_email: string | null;
+  user_slack_id: string | null;
+  user_slack_name: string | null;
 };
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -37,7 +40,8 @@ export default async function AdminOrdersPage() {
 
   const orders = (await sql`
     SELECT o.id, o.status, o.sku, o.variant, o.address, o.note, o.created_at,
-           u.display_name AS user_name, u.email AS user_email
+           u.display_name AS user_name, u.email AS user_email,
+           u.slack_id AS user_slack_id, u.slack_name AS user_slack_name
     FROM orders o
     LEFT JOIN users u ON u.id = o.user_id
     ORDER BY
@@ -80,17 +84,26 @@ export default async function AdminOrdersPage() {
             {orders.map((order) => (
               <tr key={order.id} className="border-b border-white align-top">
                 <td className="px-5 py-4">
-                  <div className="font-body text-base text-white">
-                    {order.user_name ?? "-"}
-                  </div>
-                  <div className="font-body text-sm text-white/70">
-                    {order.user_email ?? "-"}
+                  <div className="flex items-center gap-3">
+                    <SlackAvatar
+                      slackId={order.user_slack_id}
+                      fallbackName={order.user_slack_name ?? order.user_name}
+                      sizeClassName="h-12 w-12"
+                    />
+                    <div>
+                      <div className="font-body text-base text-white">
+                        {order.user_name ?? "-"}
+                      </div>
+                      <div className="font-body text-sm text-black">
+                        {order.user_email ?? "-"}
+                      </div>
+                    </div>
                   </div>
                 </td>
                 <td className="px-5 py-4 font-body text-base text-white">
                   <div>{order.sku ?? "-"}</div>
                   {order.variant ? (
-                    <div className="font-body text-sm text-white/70">
+                    <div className="font-body text-sm text-black">
                       {t("admin.orders.size", { size: order.variant })}
                     </div>
                   ) : null}

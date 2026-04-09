@@ -44,7 +44,7 @@ export type ShopOrderRow = {
 };
 
 export function buildWarehouseTrackingUrl(warehouseOrderId: string) {
-  return `https://mail.hackclub.com/warehouse_orders/${encodeURIComponent(warehouseOrderId)}`;
+  return `https://mail.hackclub.com/back_office/warehouse/orders/${encodeURIComponent(warehouseOrderId)}`;
 }
 
 export function buildWarehousePublicOrderUrl(warehouseOrderId: string) {

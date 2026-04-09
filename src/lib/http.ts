@@ -18,6 +18,24 @@ export function getSafeRedirectPath(
   return path.startsWith("/") && !path.startsWith("//") ? path : fallbackPath;
 }
 
+export function getAppUrl(path: string, request: Request) {
+  const configuredOrigin = toOrigin(optionalEnv("CURRENT_DOMAIN"));
+
+  if (configuredOrigin) {
+    return new URL(path, configuredOrigin);
+  }
+
+  return new URL(path, request.url);
+}
+
+export function getSafeRedirectUrl(
+  request: Request,
+  value: FormDataEntryValue | string | null | undefined,
+  fallbackPath: string,
+) {
+  return getAppUrl(getSafeRedirectPath(value, fallbackPath), request);
+}
+
 function toOrigin(value: string | null) {
   if (!value) return null;
 

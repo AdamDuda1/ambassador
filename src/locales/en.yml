@@ -174,7 +174,7 @@ shirt:
     placing: Placing order...
   order:
     pending-title: Order received
-    pending-body: "Your size {size} shirt is queued for review. We'll ship it once a teammate approves it."
+    pending-body: "Your size {size} shirt is queued for review. We'll ship it once the fulfillment team approves it."
     approved-title: Order approved
     approved-body: "Your size {size} shirt has been sent to the warehouse. Track shipping below."
     approved-message: "Your order is on the way. Track shipping <link>here</link>."

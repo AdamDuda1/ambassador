@@ -48,7 +48,7 @@ export type WarehouseOrderResponse = {
   id: string
   status: string
   tags: string[]
-  address: WarehouseOrderAddress
+  address: HackClubAuthAddress | null
   metadata: Record<string, unknown>
   recipient_email: string
   dispatched_at?: string
@@ -165,6 +165,12 @@ function readOptionalBoolean(value: unknown) {
   return typeof value === "boolean" ? value : undefined
 }
 
+function readOptionalStringArray(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : undefined
+}
+
 function coerceHackClubAuthAddress(value: unknown): HackClubAuthAddress | null {
   if (typeof value === "string") {
     try {
@@ -189,6 +195,73 @@ function coerceHackClubAuthAddress(value: unknown): HackClubAuthAddress | null {
     country: readOptionalString(value.country),
     phone_number: readOptionalString(value.phone_number),
     primary: readOptionalBoolean(value.primary),
+  }
+}
+
+function unwrapWarehouseOrderResponse(value: unknown): Record<string, unknown> | null {
+  if (typeof value === "string") {
+    try {
+      return unwrapWarehouseOrderResponse(JSON.parse(value) as unknown)
+    } catch {
+      return null
+    }
+  }
+
+  if (!isRecord(value)) {
+    return null
+  }
+
+  if (isRecord(value.warehouse_order)) {
+    return value.warehouse_order
+  }
+
+  return value
+}
+
+export function parseWarehouseOrderResponse(value: unknown): WarehouseOrderResponse | null {
+  const payload = unwrapWarehouseOrderResponse(value)
+
+  if (!payload) {
+    return null
+  }
+
+  const id = readOptionalString(payload.id)
+  const status = readOptionalString(payload.status)
+  const recipientEmail = readOptionalString(payload.recipient_email)
+
+  if (!id || !status || !recipientEmail) {
+    return null
+  }
+
+  return {
+    id,
+    status,
+    tags: readOptionalStringArray(payload.tags) ?? [],
+    address: coerceHackClubAuthAddress(payload.address),
+    metadata: isRecord(payload.metadata) ? payload.metadata : {},
+    recipient_email: recipientEmail,
+    dispatched_at: readOptionalString(payload.dispatched_at),
+    mailed_at: readOptionalString(payload.mailed_at),
+    tracking_number: readOptionalString(payload.tracking_number),
+    carrier: readOptionalString(payload.carrier),
+    service: readOptionalString(payload.service),
+    weight:
+      typeof payload.weight === "string" || typeof payload.weight === "number"
+        ? payload.weight
+        : undefined,
+    contents_cost:
+      typeof payload.contents_cost === "string" || typeof payload.contents_cost === "number"
+        ? payload.contents_cost
+        : undefined,
+    labor_cost:
+      typeof payload.labor_cost === "string" || typeof payload.labor_cost === "number"
+        ? payload.labor_cost
+        : undefined,
+    postage_cost:
+      typeof payload.postage_cost === "string" || typeof payload.postage_cost === "number"
+        ? payload.postage_cost
+        : undefined,
+    idempotency_key: readOptionalString(payload.idempotency_key),
   }
 }
 
@@ -269,10 +342,18 @@ export class WarehouseApiClient {
   }
 
   async createOrder(input: SendWarehouseSkuInput) {
-    return this.request<{ id: string } & WarehouseOrderResponse>("/api/v1/warehouse_orders", {
+    const response = await this.request<unknown>("/api/v1/warehouse_orders", {
       method: "POST",
       body: buildWarehouseOrderPayload(input),
     })
+
+    const order = parseWarehouseOrderResponse(response)
+
+    if (!order) {
+      throw new Error("Warehouse API returned an unexpected order payload")
+    }
+
+    return order
   }
 
   async sendSku(input: SendWarehouseSkuInput) {
@@ -280,10 +361,21 @@ export class WarehouseApiClient {
   }
 
   async getOrder(orderId: string) {
-    return this.request<WarehouseOrderResponse>(`/api/v1/warehouse_orders/${encodeURIComponent(orderId)}`, {
-      method: "GET",
-      cache: "no-store",
-    })
+    const response = await this.request<unknown>(
+      `/api/v1/warehouse_orders/${encodeURIComponent(orderId)}`,
+      {
+        method: "GET",
+        cache: "no-store",
+      },
+    )
+
+    const order = parseWarehouseOrderResponse(response)
+
+    if (!order) {
+      throw new Error("Warehouse API returned an unexpected order payload")
+    }
+
+    return order
   }
 
   private async request<TResult>(path: string, init: WarehouseRequestInit): Promise<TResult> {

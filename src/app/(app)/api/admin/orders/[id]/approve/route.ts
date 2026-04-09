@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { isUserAdmin } from "@/lib/applications/review";
 import sql from "@/lib/database/client";
 import { ensureSchema } from "@/lib/database/ensure-schema";
-import { getSafeRedirectPath, isSameOriginRequest } from "@/lib/http";
+import { getSafeRedirectUrl, isSameOriginRequest } from "@/lib/http";
 import { getSession } from "@/lib/session";
 import {
   ORDER_STATUS_APPROVED,
@@ -12,7 +12,11 @@ import {
   ORDER_STATUS_PENDING,
   ORDER_STATUS_REJECTED,
 } from "@/lib/shop";
-import { sendWarehouseSku, WarehouseApiError } from "@/lib/warehouse";
+import {
+  parseWarehouseOrderResponse,
+  sendWarehouseSku,
+  WarehouseApiError,
+} from "@/lib/warehouse";
 
 export async function POST(
   request: Request,
@@ -37,6 +41,7 @@ export async function POST(
 
   const [order] = await sql`
     SELECT o.id, o.user_id, o.status, o.sku, o.variant, o.address, o.warehouse_order_id,
+           o.warehouse_status, o.warehouse_payload,
            u.email, u.display_name
     FROM orders o
     JOIN users u ON u.id = o.user_id
@@ -71,11 +76,19 @@ export async function POST(
     return Response.json({ error: "invalid_order" }, { status: 400 });
   }
 
+  const existingWarehouseOrder = parseWarehouseOrderResponse(order.warehouse_payload);
+  const existingWarehouseOrderId =
+    order.warehouse_order_id ?? existingWarehouseOrder?.id ?? null;
+  const existingWarehouseStatus =
+    order.warehouse_status ?? existingWarehouseOrder?.status ?? null;
+
   try {
-    if (order.warehouse_order_id) {
+    if (existingWarehouseOrderId) {
       await sql`
         UPDATE orders
         SET status = ${ORDER_STATUS_APPROVED},
+            warehouse_order_id = ${existingWarehouseOrderId},
+            warehouse_status = ${existingWarehouseStatus},
             note = NULL,
             internal_fail_reason = NULL,
             reviewed_at = NOW(),
@@ -138,12 +151,7 @@ export async function POST(
     revalidatePath(`/admin/users/${order.user_id}`);
     revalidatePath("/dashboard");
 
-    return Response.redirect(
-      new URL(
-        getSafeRedirectPath(formData.get("redirectTo"), `/admin/orders`),
-        request.url,
-      ),
-    );
+    return Response.redirect(getSafeRedirectUrl(request, formData.get("redirectTo"), `/admin/orders`));
   }
 
   revalidatePath(`/admin/orders/${id}`);
@@ -151,10 +159,5 @@ export async function POST(
   revalidatePath(`/admin/users/${order.user_id}`);
   revalidatePath("/dashboard");
 
-  return Response.redirect(
-    new URL(
-      getSafeRedirectPath(formData.get("redirectTo"), `/admin/orders`),
-      request.url,
-    ),
-  );
+  return Response.redirect(getSafeRedirectUrl(request, formData.get("redirectTo"), `/admin/orders`));
 }
