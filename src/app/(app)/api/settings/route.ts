@@ -1,8 +1,5 @@
 import sql from "@/lib/database/client";
-import {
-  normalizeHackClubAddresses,
-  SUPPORTED_AMBASSADOR_REGIONS,
-} from "@/lib/settings";
+import { SUPPORTED_AMBASSADOR_REGIONS } from "@/lib/settings";
 import { isSameOriginRequest } from "@/lib/http";
 import { getSession } from "@/lib/session";
 import { ensureUserAddressSchema } from "@/lib/database/user-address-schema";
@@ -20,7 +17,6 @@ export async function POST(request: Request) {
   await ensureUserAddressSchema();
 
   const body = (await request.json().catch(() => null)) as {
-    selectedAddressIndex?: number;
     ambassadorRegion?: string;
   } | null;
 
@@ -29,30 +25,6 @@ export async function POST(request: Request) {
   }
 
   const updates: string[] = [];
-
-  if (body.selectedAddressIndex != null) {
-    if (
-      !Number.isSafeInteger(body.selectedAddressIndex) ||
-      body.selectedAddressIndex < 0
-    ) {
-      return Response.json({ error: "invalid_address_index" }, { status: 400 });
-    }
-
-    const [user] = await sql`
-      SELECT hca_addresses FROM users WHERE id = ${session.sub}
-    `;
-    const addresses = normalizeHackClubAddresses(user?.hca_addresses);
-
-    if (body.selectedAddressIndex >= addresses.length) {
-      return Response.json({ error: "invalid_address_index" }, { status: 400 });
-    }
-
-    updates.push("address");
-    await sql`
-      UPDATE users SET selected_address_index = ${body.selectedAddressIndex}, updated_at = NOW()
-      WHERE id = ${session.sub}
-    `;
-  }
 
   if (typeof body.ambassadorRegion === "string") {
     const ambassadorRegion = body.ambassadorRegion.trim();

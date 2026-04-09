@@ -14,10 +14,8 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import {
-  formatHackClubAddress,
   resolveAmbassadorRegion,
   SUPPORTED_AMBASSADOR_REGIONS,
-  type HackClubAddress,
 } from "@/lib/settings";
 
 export default function SettingsClient({
@@ -27,8 +25,6 @@ export default function SettingsClient({
   lastName,
   slackName,
   verificationStatus,
-  addresses,
-  selectedAddressIndex,
   currentRegion,
   detectedRegion,
 }: {
@@ -38,13 +34,10 @@ export default function SettingsClient({
   lastName: string;
   slackName: string;
   verificationStatus: string;
-  addresses: HackClubAddress[];
-  selectedAddressIndex: number;
   currentRegion: string | null;
   detectedRegion: string | null;
 }) {
   const t = useTranslations("settings.form");
-  const [addressIndex, setAddressIndex] = useState(selectedAddressIndex);
   const [region, setRegion] = useState(() =>
     resolveAmbassadorRegion(currentRegion, detectedRegion),
   );
@@ -70,7 +63,6 @@ export default function SettingsClient({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          selectedAddressIndex: addresses.length > 0 ? addressIndex : undefined,
           ambassadorRegion: region,
         }),
       });
@@ -81,13 +73,11 @@ export default function SettingsClient({
           error?: string;
         } | null;
         setError(
-          data?.error === "invalid_address_index"
-            ? t("errors.invalid-address-index")
-            : data?.error === "invalid_region"
-              ? t("errors.invalid-region")
-              : data?.error === "unauthorized"
-                ? t("errors.unauthorized")
-                : t("errors.generic"),
+          data?.error === "invalid_region"
+            ? t("errors.invalid-region")
+            : data?.error === "unauthorized"
+              ? t("errors.unauthorized")
+              : t("errors.generic"),
         );
       }
     } catch {
@@ -179,53 +169,6 @@ export default function SettingsClient({
       )}
 
       <hr className="border-white/10" />
-
-      {addresses.length > 0 && (
-        <div>
-          <label className="mb-2 block font-body text-base tracking-wide text-white">
-            {t("labels.shipping-address")}
-          </label>
-          {addresses.length === 1 ? (
-            <Input
-              type="text"
-              disabled
-              value={formatHackClubAddress(addresses[0])}
-              className={readOnlySurfaceClass}
-            />
-          ) : (
-            <Select
-              value={String(addressIndex)}
-              onValueChange={(v) => setAddressIndex(Number(v))}
-            >
-              <SelectTrigger
-                className={cn(
-                  surfaceClass,
-                  "!h-14 !bg-muted data-[state=open]:!bg-muted/80",
-                )}
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent
-                position="popper"
-                side="bottom"
-                sideOffset={0}
-                avoidCollisions={false}
-                className={selectContentClass}
-              >
-                {addresses.map((addr, i) => (
-                  <SelectItem
-                    key={i}
-                    value={String(i)}
-                    className="focus:bg-card focus:text-white"
-                  >
-                    {formatHackClubAddress(addr)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        </div>
-      )}
 
       <div>
         <label className="mb-2 block font-body text-base tracking-wide text-white">

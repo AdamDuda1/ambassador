@@ -1,0 +1,97 @@
+import sql from "@/lib/database/client";
+import { ensureSchema } from "@/lib/database/ensure-schema";
+import { isSameOriginRequest } from "@/lib/http";
+import { getSession } from "@/lib/session";
+import {
+  isShirtSize,
+  ORDER_STATUS_PENDING,
+  shirtSku,
+} from "@/lib/shop";
+import {
+  isAcceptedApplicationStatus,
+} from "@/lib/applications/status";
+import {
+  normalizeHackClubAddresses,
+} from "@/lib/settings";
+
+export async function POST(request: Request) {
+  if (!isSameOriginRequest(request)) {
+    return Response.json({ error: "forbidden" }, { status: 403 });
+  }
+
+  const session = await getSession();
+  if (!session) {
+    return Response.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  await ensureSchema();
+
+  const body = (await request.json().catch(() => null)) as {
+    size?: string;
+    addressIndex?: number;
+  } | null;
+
+  if (!body || !isShirtSize(body.size)) {
+    return Response.json({ error: "invalid_size" }, { status: 400 });
+  }
+
+  const [user] = await sql`
+    SELECT id, hca_addresses, selected_address_index
+    FROM users
+    WHERE id = ${session.sub}
+  `;
+  if (!user) {
+    return Response.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  const [latestApp] = await sql`
+    SELECT status FROM applications
+    WHERE user_id = ${session.sub}
+    ORDER BY created_at DESC LIMIT 1
+  `;
+  if (!latestApp || !isAcceptedApplicationStatus(latestApp.status)) {
+    return Response.json({ error: "not_ambassador" }, { status: 403 });
+  }
+
+  const addresses = normalizeHackClubAddresses(user.hca_addresses);
+  if (addresses.length === 0) {
+    return Response.json({ error: "no_address" }, { status: 400 });
+  }
+
+  const requestedIndex =
+    Number.isInteger(body.addressIndex) && (body.addressIndex as number) >= 0
+      ? (body.addressIndex as number)
+      : Number.isInteger(user.selected_address_index)
+        ? user.selected_address_index
+        : 0;
+  const addressIndex = Math.min(Math.max(requestedIndex, 0), addresses.length - 1);
+  const address = addresses[addressIndex];
+
+  const [existing] = await sql`
+    SELECT id FROM orders
+    WHERE user_id = ${session.sub} AND sku LIKE 'Swa/Shirt/HC/%'
+    LIMIT 1
+  `;
+  if (existing) {
+    return Response.json({ error: "already_ordered" }, { status: 409 });
+  }
+
+  const id = crypto.randomUUID();
+  const sku = shirtSku(body.size);
+
+  await sql`
+    INSERT INTO orders (id, user_id, status, sku, variant, quantity, address, details)
+    VALUES (
+      ${id},
+      ${session.sub},
+      ${ORDER_STATUS_PENDING},
+      ${sku},
+      ${body.size},
+      1,
+      CAST(${JSON.stringify(address)} AS JSONB),
+      CAST(${JSON.stringify({ type: "ambassador-shirt" })} AS JSONB)
+    )
+  `;
+
+  return Response.json({ ok: true, id });
+}

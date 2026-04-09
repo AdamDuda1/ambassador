@@ -5,7 +5,6 @@ import { getTranslations } from "next-intl/server";
 import { Navbar } from "@/components/navbar";
 import { getTranslatedPageMetadata } from "@/i18n/metadata";
 import sql from "@/lib/database/client";
-import { normalizeHackClubAddresses } from "@/lib/settings";
 import { getSession } from "@/lib/session";
 import { ensureUserAddressSchema } from "@/lib/database/user-address-schema";
 
@@ -25,17 +24,10 @@ export default async function SettingsPage() {
     SELECT
       display_name, email, hca_first_name, hca_last_name,
       slack_id, slack_name, verification_status,
-      hca_street_address, hca_locality, hca_region, hca_postal_code, hca_country,
-      hca_addresses, selected_address_index, ambassador_region,
-      balance_cents, is_admin, city, region, country_name, country_code
+      ambassador_region,
+      balance_cents, is_admin, country_name
     FROM users WHERE id = ${session.sub}
   `;
-
-  const addresses = normalizeHackClubAddresses(user?.hca_addresses);
-  const selectedAddressIndex =
-    Number.isInteger(user?.selected_address_index) && user.selected_address_index >= 0
-      ? Math.min(user.selected_address_index, Math.max(addresses.length - 1, 0))
-      : 0;
 
   return (
     <main className="page-shell">
@@ -51,8 +43,6 @@ export default async function SettingsPage() {
           lastName={user?.hca_last_name ?? ""}
           slackName={user?.slack_name ?? ""}
           verificationStatus={user?.verification_status ?? ""}
-          addresses={addresses}
-          selectedAddressIndex={selectedAddressIndex}
           currentRegion={user?.ambassador_region ?? null}
           detectedRegion={user?.country_name ?? null}
         />

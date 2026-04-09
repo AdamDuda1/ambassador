@@ -22,6 +22,7 @@ app:
     logo-alt: Ambassador
     admin-link: Admin
     posters-link: Posters
+    shop-link: Shop
     refresh-session: Refresh session
     settings-label: Settings
     sign-out-label: Sign out
@@ -154,6 +155,40 @@ posters:
     geolocation-unavailable: Your browser does not support geolocation.
     geolocation-denied: Precise location access was denied. Please enable it in your browser settings.
 
+shop:
+  metadata:
+    title: Shop
+  heading: Shop
+  subheading: Free Hack Club merch for ambassadors.
+  not-ambassador: The shop is only available to approved ambassadors.
+  manage-addresses: Manage addresses on Hack Club Auth
+  shirt:
+    title: Hack Club Ambassador shirt
+    subtitle: Pick a size and we'll ship it to you, on us.
+  labels:
+    size: Size
+    shipping-address: Shipping address
+  no-address:
+    body: You don't have a shipping address on file yet. Add one on Hack Club Auth, then come back here.
+    cta: Add an address on Hack Club Auth
+  actions:
+    place: Place order
+    placing: Placing order...
+  order:
+    pending-title: Order received
+    pending-body: "Your size {size} shirt is queued for review. We'll ship it once a teammate approves it."
+    approved-title: Order approved
+    approved-body: "Your size {size} shirt has been sent to the warehouse. Track shipping below."
+    rejected-title: Order rejected
+    rejected-body: We couldn't fulfil this order. Reach out if you think this is a mistake.
+    track-cta: Track on mail.hackclub.com
+  errors:
+    generic: Something went wrong.
+    not-ambassador: Only approved ambassadors can order from the shop.
+    no-address: You need a shipping address on Hack Club Auth first.
+    already-ordered: You've already ordered an ambassador shirt.
+    invalid-size: Pick a valid size.
+
 settings:
   metadata:
     title: Settings
@@ -166,7 +201,6 @@ settings:
       email: Email
       slack: Slack
       verification-status: Verification status
-      shipping-address: Shipping address
       region: Region
     actions:
       save: Save
@@ -175,7 +209,6 @@ settings:
     errors:
       generic: Something went wrong.
       unauthorized: Refresh your session and try again.
-      invalid-address-index: Pick a valid shipping address.
       invalid-region: Pick a valid region.
 
 error-pages:
@@ -288,7 +321,21 @@ admin:
     metadata:
       title: Orders
     title: Orders
-    empty: Orders coming soon
+    empty: No orders yet
+    size: "Size {size}"
+    warehouse-link: View on mail.hackclub.com ↗
+    columns:
+      user: User
+      item: Item
+      address: Address
+      status: Status
+      placed: Placed
+      actions: Actions
+    actions:
+      approve: Approve & ship
+      reject: Reject
+      note-placeholder: Optional rejection note
+      none: No actions
   applications-list:
     metadata:
       title: Applications
