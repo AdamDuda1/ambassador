@@ -2,6 +2,8 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { getLocale, getTranslations } from "next-intl/server";
 
+import { Pagination } from "@/components/admin/pagination";
+import { SearchBar } from "@/components/admin/search-bar";
 import { SlackAvatar } from "@/components/admin/slack-profile";
 import { pillVariants } from "@/components/ui/pill";
 import { getTranslatedPageMetadata } from "@/i18n/metadata";
@@ -34,28 +36,58 @@ export async function generateMetadata(): Promise<Metadata> {
   return getTranslatedPageMetadata("admin.orders.metadata.title");
 }
 
-export default async function AdminOrdersPage() {
-  const [t, locale] = await Promise.all([getTranslations(), getLocale()]);
+export default async function AdminOrdersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string; q?: string }>;
+}) {
+  const [t, locale, query] = await Promise.all([getTranslations(), getLocale(), searchParams]);
   await ensureSchema();
 
-  const orders = (await sql`
-    SELECT o.id, o.status, o.sku, o.variant, o.address, o.note, o.created_at,
-           u.display_name AS user_name, u.email AS user_email,
-           u.slack_id AS user_slack_id, u.slack_name AS user_slack_name
-    FROM orders o
-    LEFT JOIN users u ON u.id = o.user_id
-    ORDER BY
-      CASE WHEN o.status = ${ORDER_STATUS_PENDING} THEN 0 ELSE 1 END,
-      o.created_at DESC
-    LIMIT 200
-  `) as unknown as OrderRow[];
+  const page = Math.max(1, Number(query.page ?? "1"));
+  const offset = (page - 1) * 20;
+  const search = query.q?.trim() ?? "";
+  const searchFilter = search ? `%${search}%` : null;
+
+  const [orders, countResult] = await Promise.all([
+    sql`
+      SELECT o.id, o.status, o.sku, o.variant, o.address, o.note, o.created_at,
+             u.display_name AS user_name, u.email AS user_email,
+             u.slack_id AS user_slack_id, u.slack_name AS user_slack_name
+      FROM orders o
+      LEFT JOIN users u ON u.id = o.user_id
+      WHERE (${searchFilter}::text IS NULL OR (
+        u.display_name ILIKE ${searchFilter}
+        OR u.email ILIKE ${searchFilter}
+        OR u.slack_id ILIKE ${searchFilter}
+        OR u.slack_name ILIKE ${searchFilter}
+      ))
+      ORDER BY
+        CASE WHEN o.status = ${ORDER_STATUS_PENDING} THEN 0 ELSE 1 END,
+        o.created_at DESC
+      LIMIT ${20} OFFSET ${offset}
+    ` as unknown as OrderRow[],
+    sql`
+      SELECT COUNT(*)::int AS total
+      FROM orders o
+      LEFT JOIN users u ON u.id = o.user_id
+      WHERE (${searchFilter}::text IS NULL OR (
+        u.display_name ILIKE ${searchFilter}
+        OR u.email ILIKE ${searchFilter}
+        OR u.slack_id ILIKE ${searchFilter}
+        OR u.slack_name ILIKE ${searchFilter}
+      ))
+    `,
+  ]);
+
+  const totalCount = (countResult[0] as { total: number })?.total ?? 0;
 
   return (
     <div className="space-y-6">
       <header className="space-y-2">
         <h1 className="text-4xl text-white">{t("admin.orders.title")}</h1>
       </header>
-
+      <SearchBar placeholder={t("admin.search-placeholder")} />
       <div className="overflow-x-auto border border-white/10 bg-card p-3 md:p-4">
         <table className="w-full text-left">
           <thead>
@@ -142,6 +174,15 @@ export default async function AdminOrdersPage() {
             )}
           </tbody>
         </table>
+        <Pagination
+          totalCount={totalCount}
+          pageSize={20}
+          labels={{
+            previous: t("admin.pagination.previous"),
+            next: t("admin.pagination.next"),
+            page: t("admin.pagination.page"),
+          }}
+        />
       </div>
     </div>
   );

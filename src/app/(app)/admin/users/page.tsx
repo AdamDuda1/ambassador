@@ -2,6 +2,8 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { getLocale, getTranslations } from "next-intl/server";
 
+import { Pagination } from "@/components/admin/pagination";
+import { SearchBar } from "@/components/admin/search-bar";
 import { SlackAvatar } from "@/components/admin/slack-profile";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { getTranslatedPageMetadata } from "@/i18n/metadata";
@@ -12,35 +14,66 @@ export async function generateMetadata(): Promise<Metadata> {
   return getTranslatedPageMetadata("admin.users-list.metadata.title");
 }
 
-export default async function AdminUsersPage() {
-  const [t, locale] = await Promise.all([getTranslations(), getLocale()]);
+export default async function AdminUsersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string; q?: string }>;
+}) {
+  const [t, locale, query] = await Promise.all([getTranslations(), getLocale(), searchParams]);
   await ensureSchema();
-  const users = await sql`
-    SELECT u.id, u.email, u.display_name, u.slack_id, u.slack_name, u.is_admin,
-           u.created_at, latest.id AS latest_application_id, latest.status AS latest_application_status,
-           app_count.application_count
-    FROM users u
-    LEFT JOIN LATERAL (
-      SELECT id, status
-      FROM applications
-      WHERE user_id = u.id
-      ORDER BY created_at DESC, id DESC
-      LIMIT 1
-    ) latest ON true
-    LEFT JOIN LATERAL (
-      SELECT COUNT(*)::int AS application_count
-      FROM applications
-      WHERE user_id = u.id
-    ) app_count ON true
-    ORDER BY u.created_at DESC
-    LIMIT 100
-  `;
+
+  const page = Math.max(1, Number(query.page ?? "1"));
+  const offset = (page - 1) * 20;
+  const search = query.q?.trim() ?? "";
+  const searchFilter = search ? `%${search}%` : null;
+
+  const [users, countResult] = await Promise.all([
+    sql`
+      SELECT u.id, u.email, u.display_name, u.slack_id, u.slack_name, u.is_admin,
+             u.created_at, latest.id AS latest_application_id, latest.status AS latest_application_status,
+             app_count.application_count
+      FROM users u
+      LEFT JOIN LATERAL (
+        SELECT id, status
+        FROM applications
+        WHERE user_id = u.id
+        ORDER BY created_at DESC, id DESC
+        LIMIT 1
+      ) latest ON true
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*)::int AS application_count
+        FROM applications
+        WHERE user_id = u.id
+      ) app_count ON true
+      WHERE (${searchFilter}::text IS NULL OR (
+        u.display_name ILIKE ${searchFilter}
+        OR u.email ILIKE ${searchFilter}
+        OR u.slack_id ILIKE ${searchFilter}
+        OR u.slack_name ILIKE ${searchFilter}
+      ))
+      ORDER BY u.created_at DESC
+      LIMIT ${20} OFFSET ${offset}
+    `,
+    sql`
+      SELECT COUNT(*)::int AS total
+      FROM users u
+      WHERE (${searchFilter}::text IS NULL OR (
+        u.display_name ILIKE ${searchFilter}
+        OR u.email ILIKE ${searchFilter}
+        OR u.slack_id ILIKE ${searchFilter}
+        OR u.slack_name ILIKE ${searchFilter}
+      ))
+    `,
+  ]);
+
+  const totalCount = countResult[0]?.total ?? 0;
 
   return (
     <div className="space-y-6">
       <header className="space-y-2">
         <h1 className="text-4xl text-white">{t("admin.users-list.title")}</h1>
       </header>
+      <SearchBar placeholder={t("admin.search-placeholder")} />
       <div className="overflow-x-auto border border-white/10 bg-card p-3 md:p-4">
         <table className="w-full text-left">
           <thead>
@@ -108,6 +141,15 @@ export default async function AdminUsersPage() {
             )}
           </tbody>
         </table>
+        <Pagination
+          totalCount={totalCount}
+          pageSize={20}
+          labels={{
+            previous: t("admin.pagination.previous"),
+            next: t("admin.pagination.next"),
+            page: t("admin.pagination.page"),
+          }}
+        />
       </div>
     </div>
   );

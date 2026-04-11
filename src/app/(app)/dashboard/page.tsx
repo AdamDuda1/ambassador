@@ -260,7 +260,15 @@ function resolveState({
       devState: "pending-checks",
     },
     approved: {
-      node: <ApprovedApplication t={t} shirt={shirt} />,
+      node: (
+        <ApprovedApplication
+          t={t}
+          shirt={shirt}
+          canShowShirtSection={Boolean(
+            application && isAcceptedApplicationStatus(application.status),
+          )}
+        />
+      ),
       activeStep: "decision",
       decision: "approved",
       devState: "approved",
@@ -540,9 +548,11 @@ function PendingAutomaticChecksApplication({ t }: { t: DashboardTranslations }) 
 function ApprovedApplication({
   t,
   shirt,
+  canShowShirtSection,
 }: {
   t: DashboardTranslations;
   shirt: ShirtOrderSectionProps;
+  canShowShirtSection: boolean;
 }) {
   return (
     <div className="space-y-8">
@@ -552,7 +562,7 @@ function ApprovedApplication({
         title={t("dashboard.approved.title")}
         body={t("dashboard.approved.body")}
       />
-      <ShirtOrderSection {...shirt} />
+      {canShowShirtSection ? <ShirtOrderSection {...shirt} /> : null}
     </div>
   );
 }

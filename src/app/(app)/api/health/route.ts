@@ -24,14 +24,13 @@ async function getHealthResponse() {
       },
     );
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("Health check failed", { error });
 
     return Response.json(
       {
         ok: false,
         durationMs: Date.now() - startedAt,
         error: "database_unavailable",
-        message,
       },
       {
         status: 503,

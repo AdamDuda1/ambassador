@@ -1,5 +1,6 @@
 "use client";
 
+import { Lock } from "lucide-react";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 
@@ -88,12 +89,12 @@ export default function SettingsClient({
     }
   };
 
+  const authHint = t("labels.auth-hint");
+
   return (
     <div className="mt-8 space-y-6">
       <div>
-        <label className="mb-2 block font-body text-base tracking-wide text-white">
-          {t("labels.name")}
-        </label>
+        <LockedLabel text={t("labels.name")} hint={authHint} />
         <Input
           type="text"
           disabled
@@ -105,9 +106,7 @@ export default function SettingsClient({
       {(firstName || lastName) && (
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="mb-2 block font-body text-base tracking-wide text-white">
-              {t("labels.first-name")}
-            </label>
+            <LockedLabel text={t("labels.first-name")} hint={authHint} />
             <Input
               type="text"
               disabled
@@ -116,9 +115,7 @@ export default function SettingsClient({
             />
           </div>
           <div>
-            <label className="mb-2 block font-body text-base tracking-wide text-white">
-              {t("labels.last-name")}
-            </label>
+            <LockedLabel text={t("labels.last-name")} hint={authHint} />
             <Input
               type="text"
               disabled
@@ -130,9 +127,7 @@ export default function SettingsClient({
       )}
 
       <div>
-        <label className="mb-2 block font-body text-base tracking-wide text-white">
-          {t("labels.email")}
-        </label>
+        <LockedLabel text={t("labels.email")} hint={authHint} />
         <Input
           type="email"
           disabled
@@ -143,9 +138,7 @@ export default function SettingsClient({
 
       {slackName && (
         <div>
-          <label className="mb-2 block font-body text-base tracking-wide text-white">
-            {t("labels.slack")}
-          </label>
+          <LockedLabel text={t("labels.slack")} hint={authHint} />
           <Input
             type="text"
             disabled
@@ -157,9 +150,7 @@ export default function SettingsClient({
 
       {verificationStatus && (
         <div>
-          <label className="mb-2 block font-body text-base tracking-wide text-white">
-            {t("labels.verification-status")}
-          </label>
+          <LockedLabel text={t("labels.verification-status")} hint={authHint} />
           <Input
             type="text"
             disabled
@@ -219,5 +210,29 @@ export default function SettingsClient({
         </button>
       </div>
     </div>
+  );
+}
+
+function LockedLabel({ text, hint }: { text: string; hint: string }) {
+  const [show, setShow] = useState(false);
+  return (
+    <label className="mb-2 flex items-center gap-1.5 font-body text-base tracking-wide text-white">
+      {text}
+      <span
+        className="relative inline-flex cursor-help"
+        onMouseEnter={() => setShow(true)}
+        onMouseLeave={() => setShow(false)}
+      >
+        <Lock size={14} className="text-foreground/40" />
+        {show && (
+          <span
+            className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 w-56 -translate-x-1/2 !rounded-none px-3 py-2 font-body text-xs"
+            style={{ backgroundColor: "#000", color: "#fff" }}
+          >
+            {hint}
+          </span>
+        )}
+      </span>
+    </label>
   );
 }

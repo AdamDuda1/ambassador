@@ -218,6 +218,7 @@ settings:
       slack: Slack
       verification-status: Verification status
       region: Region
+      auth-hint: You can only change this setting on the Hack Club Auth portal.
     actions:
       save: Save
       saving: Saving...
@@ -288,6 +289,11 @@ status:
   rejected-permenant: Banned
 
 admin:
+  search-placeholder: Search by name, email or Slack ID...
+  pagination:
+    previous: Previous
+    next: Next
+    page: Page
   tabs:
     dashboard: Overview
     users: Users

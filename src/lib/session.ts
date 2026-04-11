@@ -1,6 +1,7 @@
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 import { cookies } from "next/headers";
 
+import sql from "@/lib/database/client";
 import { isProduction, requireEnv } from "@/lib/env";
 
 const COOKIE_NAME = "ambassador_token";
@@ -135,7 +136,14 @@ export async function getSession(): Promise<SessionPayload | null> {
     return actorSession;
   }
 
-  if (!actorSession.isAdmin || impersonation.actor.sub !== actorSession.sub) {
+  const [actorUser] = await sql<{ is_admin: boolean | null }[]>`
+    SELECT is_admin
+    FROM users
+    WHERE id = ${actorSession.sub}
+    LIMIT 1
+  `;
+
+  if (!actorUser?.is_admin || impersonation.actor.sub !== actorSession.sub) {
     return actorSession;
   }
 

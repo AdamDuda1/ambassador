@@ -32,6 +32,7 @@ export async function POST(request: Request) {
   if (!body || !isShirtSize(body.size)) {
     return Response.json({ error: "invalid_size" }, { status: 400 });
   }
+  const size = body.size;
 
   const [user] = await sql`
     SELECT id, shirt_enabled, hca_addresses, hca_access_token
@@ -89,21 +90,56 @@ export async function POST(request: Request) {
   }
 
   const id = crypto.randomUUID();
-  const sku = shirtSku(body.size);
+  const sku = shirtSku(size);
 
-  await sql`
-    INSERT INTO orders (id, user_id, status, sku, variant, quantity, address, details)
-    VALUES (
-      ${id},
-      ${session.sub},
-      ${ORDER_STATUS_PENDING},
-      ${sku},
-      ${body.size},
-      1,
-      CAST(${JSON.stringify(address)} AS JSONB),
-      CAST(${JSON.stringify({ type: "ambassador-shirt" })} AS JSONB)
-    )
-  `;
+  const details = JSON.stringify({ type: "ambassador-shirt" });
+  const serializedAddress = JSON.stringify(address);
+
+  const created = await sql.begin(async (transaction) => {
+    const [lockedUser] = await transaction`
+      SELECT id
+      FROM users
+      WHERE id = ${session.sub}
+      LIMIT 1
+      FOR UPDATE
+    `;
+
+    if (!lockedUser) {
+      return { ok: false as const, status: 401, error: "unauthorized" };
+    }
+
+    const [lockedLatestOrder] = await transaction`
+      SELECT id, status
+      FROM orders
+      WHERE user_id = ${session.sub} AND sku LIKE ${`${SHIRT_SKU_PREFIX}%`}
+      ORDER BY created_at DESC, id DESC
+      LIMIT 1
+    `;
+
+    if (lockedLatestOrder && !canPlaceAnotherShirtOrder(lockedLatestOrder.status)) {
+      return { ok: false as const, status: 409, error: "already_ordered" };
+    }
+
+    await transaction`
+      INSERT INTO orders (id, user_id, status, sku, variant, quantity, address, details)
+      VALUES (
+        ${id},
+        ${session.sub},
+        ${ORDER_STATUS_PENDING},
+        ${sku},
+        ${size},
+        1,
+        CAST(${serializedAddress} AS JSONB),
+        CAST(${details} AS JSONB)
+      )
+    `;
+
+    return { ok: true as const };
+  });
+
+  if (!created.ok) {
+    return Response.json({ error: created.error }, { status: created.status });
+  }
 
   return Response.json({ ok: true, id });
 }

@@ -2,6 +2,8 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { getLocale, getTranslations } from "next-intl/server";
 
+import { Pagination } from "@/components/admin/pagination";
+import { SearchBar } from "@/components/admin/search-bar";
 import { SlackAvatar } from "@/components/admin/slack-profile";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { pillVariants } from "@/components/ui/pill";
@@ -13,33 +15,71 @@ export async function generateMetadata(): Promise<Metadata> {
   return getTranslatedPageMetadata("admin.applications-list.metadata.title");
 }
 
-export default async function AdminApplicationsPage() {
-  const [t, locale] = await Promise.all([getTranslations(), getLocale()]);
+export default async function AdminApplicationsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string; q?: string }>;
+}) {
+  const [t, locale, query] = await Promise.all([getTranslations(), getLocale(), searchParams]);
   await ensureSchema();
-  const applications = await sql`
-    SELECT a.id, a.status, a.name, a.applicant_email, a.applicant_slack_id,
-           a.address_city, a.address_state, a.address_country, a.submitted_ip,
-           a.city, a.country_code, a.created_at,
-           COALESCE(latest.id = a.id, TRUE) AS is_latest,
-           u.display_name AS user_name, u.email AS user_email, u.slack_id, u.slack_name
-    FROM applications a
-    LEFT JOIN users u ON u.id = a.user_id
-    LEFT JOIN LATERAL (
-      SELECT id
-      FROM applications
-      WHERE user_id = a.user_id
-      ORDER BY created_at DESC, id DESC
-      LIMIT 1
-    ) latest ON true
-    ORDER BY a.created_at DESC
-    LIMIT 100
-  `;
+
+  const page = Math.max(1, Number(query.page ?? "1"));
+  const offset = (page - 1) * 20;
+  const search = query.q?.trim() ?? "";
+  const searchFilter = search ? `%${search}%` : null;
+
+  const [applications, countResult] = await Promise.all([
+    sql`
+      SELECT a.id, a.status, a.name, a.applicant_email, a.applicant_slack_id,
+             a.address_city, a.address_state, a.address_country, a.submitted_ip,
+             a.city, a.country_code, a.created_at,
+             COALESCE(latest.id = a.id, TRUE) AS is_latest,
+             u.display_name AS user_name, u.email AS user_email, u.slack_id, u.slack_name
+      FROM applications a
+      LEFT JOIN users u ON u.id = a.user_id
+      LEFT JOIN LATERAL (
+        SELECT id
+        FROM applications
+        WHERE user_id = a.user_id
+        ORDER BY created_at DESC, id DESC
+        LIMIT 1
+      ) latest ON true
+      WHERE (${searchFilter}::text IS NULL OR (
+        a.name ILIKE ${searchFilter}
+        OR a.applicant_email ILIKE ${searchFilter}
+        OR a.applicant_slack_id ILIKE ${searchFilter}
+        OR u.display_name ILIKE ${searchFilter}
+        OR u.email ILIKE ${searchFilter}
+        OR u.slack_id ILIKE ${searchFilter}
+        OR u.slack_name ILIKE ${searchFilter}
+      ))
+      ORDER BY a.created_at DESC
+      LIMIT ${20} OFFSET ${offset}
+    `,
+    sql`
+      SELECT COUNT(*)::int AS total
+      FROM applications a
+      LEFT JOIN users u ON u.id = a.user_id
+      WHERE (${searchFilter}::text IS NULL OR (
+        a.name ILIKE ${searchFilter}
+        OR a.applicant_email ILIKE ${searchFilter}
+        OR a.applicant_slack_id ILIKE ${searchFilter}
+        OR u.display_name ILIKE ${searchFilter}
+        OR u.email ILIKE ${searchFilter}
+        OR u.slack_id ILIKE ${searchFilter}
+        OR u.slack_name ILIKE ${searchFilter}
+      ))
+    `,
+  ]);
+
+  const totalCount = countResult[0]?.total ?? 0;
 
   return (
     <div className="space-y-6">
       <header className="space-y-2">
         <h1 className="text-4xl text-white">{t("admin.applications-list.title")}</h1>
       </header>
+      <SearchBar placeholder={t("admin.search-placeholder")} />
       <div className="overflow-x-auto border border-white/10 bg-card p-3 md:p-4">
         <table className="w-full text-left">
           <thead>
@@ -119,6 +159,15 @@ export default async function AdminApplicationsPage() {
             )}
           </tbody>
         </table>
+        <Pagination
+          totalCount={totalCount}
+          pageSize={20}
+          labels={{
+            previous: t("admin.pagination.previous"),
+            next: t("admin.pagination.next"),
+            page: t("admin.pagination.page"),
+          }}
+        />
       </div>
     </div>
   );

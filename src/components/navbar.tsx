@@ -64,13 +64,15 @@ export async function Navbar({
           >
             <Icon glyph="settings" size={20} />
           </a>
-          <a
-            href="/api/auth/logout"
-            aria-label={t("app.navbar.sign-out-label")}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-white transition-opacity hover:opacity-70"
-          >
-            <Icon glyph="door-leave" size={20} />
-          </a>
+          <form action="/api/auth/logout" method="POST">
+            <button
+              type="submit"
+              aria-label={t("app.navbar.sign-out-label")}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-white transition-opacity hover:opacity-70"
+            >
+              <Icon glyph="door-leave" size={20} />
+            </button>
+          </form>
         </div>
       </div>
     </nav>
