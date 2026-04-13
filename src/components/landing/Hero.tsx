@@ -62,11 +62,11 @@ export default function Hero() {
         <h1 className="text-5xl text-pretty mt-8 font-jersey">{t("hero.0")}</h1>
         <h1 className="text-5xl relative isolate font-jersey">
           {t("hero.1")}{" "}
-          <span className="relative inline-block">
+          <span className="relative mx-2.5 inline-block">
             {t("hero.2")}
             <Image
               src={highlight}
-              alt="Hack Club Ambassador"
+              alt=""
               className="h-12 max-w-none absolute -z-10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-auto"
               sizes="10rem"
               unoptimized

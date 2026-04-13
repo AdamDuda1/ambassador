@@ -46,7 +46,11 @@ const questions = [
         topped up if you need more.
       </span>,
       <span key="what-get-3">
-        We&rsquo;ll also give you Hack Club branded t-shirts and merch.
+        If you run 2 or more meetups each month in June, July and August,
+        we&rsquo;ll give you a $100 honorarium, paid at the end of August.
+      </span>,
+      <span key="what-get-4">
+        We&rsquo;ll also send you Hack Club branded t-shirts and merch.
       </span>,
     ],
   },
