@@ -3,6 +3,7 @@ const { createCipheriv, createHash, randomBytes } = require("node:crypto");
 
 const ENCRYPTED_PREFIX = "enc:v1";
 const ENCRYPTION_CONTEXT = "ambassador:hca-access-token";
+const GCM_AUTH_TAG_LENGTH = 16;
 
 function requireEnv(name) {
   const value = process.env[name] && process.env[name].trim();
@@ -22,7 +23,9 @@ function getEncryptionKey() {
 
 function encryptToken(token, key) {
   const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", key, iv);
+  const cipher = createCipheriv("aes-256-gcm", key, iv, {
+    authTagLength: GCM_AUTH_TAG_LENGTH,
+  });
   const ciphertext = Buffer.concat([cipher.update(token, "utf8"), cipher.final()]);
   const authTag = cipher.getAuthTag();
 
@@ -74,35 +77,33 @@ module.exports = async function migrate(sql) {
 
   const encryptionKey = getEncryptionKey();
 
-  await sql.begin(async (transaction) => {
-    for (const user of users) {
-      const token =
-        typeof user.hca_access_token === "string"
-          ? user.hca_access_token.trim()
-          : "";
+  for (const user of users) {
+    const token =
+      typeof user.hca_access_token === "string"
+        ? user.hca_access_token.trim()
+        : "";
 
-      if (!token) {
-        await transaction`
-          UPDATE users
-          SET hca_access_token = NULL,
-              hca_access_token_encrypted_at = NULL,
-              updated_at = NOW()
-          WHERE id = ${user.id}
-        `;
-        continue;
-      }
-
-      const encryptedToken = token.startsWith(`${ENCRYPTED_PREFIX}:`)
-        ? token
-        : encryptToken(token, encryptionKey);
-
-      await transaction`
+    if (!token) {
+      await sql`
         UPDATE users
-        SET hca_access_token = ${encryptedToken},
-            hca_access_token_encrypted_at = COALESCE(hca_access_token_encrypted_at, NOW()),
+        SET hca_access_token = NULL,
+            hca_access_token_encrypted_at = NULL,
             updated_at = NOW()
         WHERE id = ${user.id}
       `;
+      continue;
     }
-  });
+
+    const encryptedToken = token.startsWith(`${ENCRYPTED_PREFIX}:`)
+      ? token
+      : encryptToken(token, encryptionKey);
+
+    await sql`
+      UPDATE users
+      SET hca_access_token = ${encryptedToken},
+          hca_access_token_encrypted_at = COALESCE(hca_access_token_encrypted_at, NOW()),
+          updated_at = NOW()
+      WHERE id = ${user.id}
+    `;
+  }
 };
