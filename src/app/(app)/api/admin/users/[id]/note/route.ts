@@ -32,27 +32,27 @@ export async function POST(
   const trimmedNote = typeof rawNote === "string" ? rawNote.trim() : "";
   const nextNote = trimmedNote.length > 0 ? trimmedNote : null;
 
-  const [user] = await sql<{ id: string }[]>`
+  const user = (await sql<{ id: string }[]>`
     SELECT id
     FROM users
     WHERE id = ${id}
     LIMIT 1
-  `;
+  `).at(0) ?? null;
 
-  if (!user) {
+  if (user === null) {
     return Response.json({ error: "not_found" }, { status: 404 });
   }
 
-  const [latestNoteEvent] = await sql<{ note: string | null }[]>`
+  const latestNoteEvent = (await sql<{ note: string | null }[]>`
     SELECT note
     FROM user_note_events
     WHERE user_id = ${id}
     ORDER BY created_at DESC, id DESC
     LIMIT 1
-  `;
+  `).at(0) ?? null;
 
   const currentNote =
-    typeof latestNoteEvent?.note === "string" && latestNoteEvent.note.trim().length > 0
+    latestNoteEvent !== null && latestNoteEvent.note !== null && latestNoteEvent.note.trim().length > 0
       ? latestNoteEvent.note.trim()
       : null;
 

@@ -50,12 +50,13 @@ export async function POST(request: Request) {
     return Response.json({ error: "invalid_size" }, { status: 400 });
   }
 
-  const sizeValue = body.size;
+  const payload: Record<string, unknown> = Object.fromEntries(Object.entries(body));
+  const sizeValue = payload.size;
   if (!isShirtSize(sizeValue)) {
     return Response.json({ error: "invalid_size" }, { status: 400 });
   }
   const size = sizeValue;
-  const addressIndexValue = body.addressIndex;
+  const addressIndexValue = payload.addressIndex;
 
   const user = (await sql<ShirtOrderUserRow[]>`
     SELECT id, hca_addresses, hca_access_token, manual_dashboard_state

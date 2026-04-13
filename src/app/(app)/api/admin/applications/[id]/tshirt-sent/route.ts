@@ -1,5 +1,5 @@
 import { logAdminActionEvent } from "@/lib/admin-action-events";
-import { isUserAdmin, setApplicationTshirtShipped } from "@/lib/applications/review";
+import { isUserAdmin, setApplicationTshirtSent } from "@/lib/applications/review";
 import sql from "@/lib/database/client";
 import { ensureSchema } from "@/lib/database/ensure-schema";
 import { getSafeRedirectUrl, isSameOriginRequest } from "@/lib/http";
@@ -26,38 +26,37 @@ export async function POST(
 
   const { id } = await params;
   const formData = await request.formData();
-  const value = formData.get("shipped");
-  const shipped = value === "true";
-  const [existingApplication] = await sql<{
+  const sent = formData.get("sent") === "true";
+  const existingApplication = (await sql<{
     id: string;
     user_id: string | null;
-    tshirt_shipped: boolean | null;
+    tshirt_sent: boolean | null;
   }[]>`
-    SELECT id, user_id, tshirt_shipped
+    SELECT id, user_id, tshirt_shipped AS tshirt_sent
     FROM applications
     WHERE id = ${id}
     LIMIT 1
-  `;
+  `).at(0) ?? null;
 
-  if (!existingApplication) {
+  if (existingApplication === null) {
     return Response.json({ error: "not_found" }, { status: 404 });
   }
 
-  const updatedApplication = await setApplicationTshirtShipped(id, shipped);
+  const updatedApplication = await setApplicationTshirtSent(id, sent);
 
   if (!updatedApplication) {
     return Response.json({ error: "not_found" }, { status: 404 });
   }
 
-  if (Boolean(existingApplication.tshirt_shipped) !== shipped) {
+  if (Boolean(existingApplication.tshirt_sent) !== sent) {
     await logAdminActionEvent({
       actorUserId: session.sub,
       targetUserId: existingApplication.user_id ?? null,
-      action: "application_tshirt_shipped_updated",
+      action: "application_tshirt_sent_updated",
       metadata: {
         applicationId: id,
-        previousShipped: Boolean(existingApplication.tshirt_shipped),
-        nextShipped: shipped,
+        previousSent: Boolean(existingApplication.tshirt_sent),
+        nextSent: sent,
       },
     });
   }

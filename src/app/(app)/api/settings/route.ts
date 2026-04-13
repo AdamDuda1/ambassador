@@ -22,8 +22,9 @@ export async function POST(request: Request) {
     return Response.json({ error: "invalid_body" }, { status: 400 });
   }
 
+  const payload: Record<string, unknown> = Object.fromEntries(Object.entries(body));
   const updates: string[] = [];
-  const ambassadorRegionValue = body.ambassadorRegion;
+  const ambassadorRegionValue = payload.ambassadorRegion;
 
   if (typeof ambassadorRegionValue === "string") {
     const ambassadorRegion = ambassadorRegionValue.trim();

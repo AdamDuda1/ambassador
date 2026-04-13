@@ -43,6 +43,10 @@ export type GeoResult = {
   org?: string;
 };
 
+type VisitIdRow = {
+  id: string;
+};
+
 export async function fetchGeo(ip: string): Promise<GeoResult | null> {
   if (isPrivateIp(ip)) return null;
 
@@ -55,21 +59,25 @@ export async function fetchGeo(ip: string): Promise<GeoResult | null> {
 
   if (!res.ok) return null;
 
-  const geo = (await res.json()) as GeocoderResponse;
-  if (geo.error || typeof geo.lat !== "number" || typeof geo.lng !== "number") {
+  const data = await res.json();
+  const geo: Record<string, unknown> | null =
+    typeof data === "object" && data !== null && !Array.isArray(data)
+      ? Object.fromEntries(Object.entries(data))
+      : null;
+  if (geo === null || typeof geo.lat !== "number" || typeof geo.lng !== "number" || typeof geo.error === "string") {
     return null;
   }
 
   return {
     latitude: geo.lat,
     longitude: geo.lng,
-    city: geo.city?.trim() || null,
-    region: geo.region?.trim() || null,
-    country_name: geo.country_name?.trim() || null,
-    country_code: geo.country_code?.trim() || null,
-    postal_code: geo.postal_code?.trim() || undefined,
-    timezone: geo.timezone?.trim() || undefined,
-    org: geo.org?.trim() || undefined,
+    city: typeof geo.city === "string" && geo.city.trim() !== "" ? geo.city.trim() : null,
+    region: typeof geo.region === "string" && geo.region.trim() !== "" ? geo.region.trim() : null,
+    country_name: typeof geo.country_name === "string" && geo.country_name.trim() !== "" ? geo.country_name.trim() : null,
+    country_code: typeof geo.country_code === "string" && geo.country_code.trim() !== "" ? geo.country_code.trim() : null,
+    postal_code: typeof geo.postal_code === "string" && geo.postal_code.trim() !== "" ? geo.postal_code.trim() : undefined,
+    timezone: typeof geo.timezone === "string" && geo.timezone.trim() !== "" ? geo.timezone.trim() : undefined,
+    org: typeof geo.org === "string" && geo.org.trim() !== "" ? geo.org.trim() : undefined,
   };
 }
 
@@ -120,12 +128,12 @@ export async function geocodeIp(
       WHERE id = ${id}
     `;
   } else if (table === "ip_visits" && userId && visitType) {
-    const [visit] = await sql`
+    const visit = (await sql<VisitIdRow[]>`
       SELECT id FROM ip_visits
       WHERE user_id = ${userId} AND visit_type = ${visitType}
       ORDER BY created_at DESC LIMIT 1
-    `;
-    if (visit) {
+    `).at(0) ?? null;
+    if (visit !== null) {
       await sql`
         UPDATE ip_visits SET
           latitude = ${geo.latitude},
@@ -147,14 +155,14 @@ export async function geocodeIp(
 export async function trackAnonymousVisit(ip: string) {
   if (isPrivateIp(ip)) return;
 
-  const [recent] = await sql`
+  const recent = (await sql<VisitIdRow[]>`
     SELECT id FROM ip_visits
     WHERE ip = ${ip} AND visit_type = 'anonymous'
     AND created_at > NOW() - INTERVAL '1 minute'
     ORDER BY created_at DESC LIMIT 1
-  `;
+  `).at(0) ?? null;
 
-  if (recent) return;
+  if (recent !== null) return;
 
   const visitId = crypto.randomUUID();
   await sql`
@@ -190,14 +198,14 @@ async function geocodeVisit(ip: string, visitId: string) {
 export async function trackAuthenticatedVisit(ip: string, userId: string) {
   if (isPrivateIp(ip)) return;
 
-  const [recent] = await sql`
+  const recent = (await sql<VisitIdRow[]>`
     SELECT id FROM ip_visits
     WHERE user_id = ${userId} AND visit_type = 'revisit'
     AND created_at > NOW() - INTERVAL '10 minutes'
     ORDER BY created_at DESC LIMIT 1
-  `;
+  `).at(0) ?? null;
 
-  if (recent) return;
+  if (recent !== null) return;
 
   const visitId = crypto.randomUUID();
   await sql`

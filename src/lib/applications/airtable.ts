@@ -7,6 +7,7 @@ import {
   type ApplicationFieldKey,
   getAirtableBaseId,
   getAirtableFieldId,
+  getAirtableFieldName,
   getAirtableFieldValue,
   getAirtableTableId,
 } from "@/lib/airtable-schema";
@@ -40,6 +41,10 @@ export function getAirtableApplicationFieldId(fieldKey: ApplicationFieldKey) {
   return getAirtableFieldId("applications", fieldKey);
 }
 
+function getAirtableApplicationFieldName(fieldKey: ApplicationFieldKey) {
+  return getAirtableFieldName("applications", fieldKey);
+}
+
 export function getAirtableApplicationFieldValue(
   fields: Record<string, unknown>,
   key: ApplicationFieldKey,
@@ -61,7 +66,7 @@ export async function listAirtableApplicationRecords(options: AirtableReadOption
       {
         offset,
         pageSize: 100,
-        sort: [{ field: getAirtableApplicationFieldId("id"), direction: "asc" }],
+        sort: [{ field: getAirtableApplicationFieldName("id"), direction: "asc" }],
       },
       {
         ...options,
@@ -71,7 +76,7 @@ export async function listAirtableApplicationRecords(options: AirtableReadOption
 
     records.push(...response.records);
     offset = response.offset;
-  } while (offset);
+  } while (offset !== undefined && offset !== "");
 
   return records;
 }
@@ -81,14 +86,17 @@ export async function syncApplicationReviewDecisionToAirtable(
 ) {
   const client = getAirtableApplicationsClient();
   const recordId = input.airtableRecordId?.trim();
+  const trimmedNote = input.note?.trim();
 
-  if (!client || !recordId) return null;
+  if (client === null || recordId === undefined || recordId === "") return null;
 
   try {
     await client.updateRecord(getAirtableApplicationsTableId(), recordId, {
       [getAirtableApplicationFieldId("status")]: input.status,
       [getAirtableApplicationFieldId("rejectionReason")]:
-        input.status === APPLICATION_STATUS_ACCEPTED ? null : input.note?.trim() || null,
+        input.status === APPLICATION_STATUS_ACCEPTED || trimmedNote === undefined || trimmedNote === ""
+          ? null
+          : trimmedNote,
     });
   } catch (error) {
     if (error instanceof AirtableError && error.status === 404) {

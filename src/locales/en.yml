@@ -480,8 +480,8 @@ admin:
       permanent-rejection-note-label: Permanent rejection note
       permanent-rejection-note-placeholder: Optional context for permanent rejection
       reject-permanently: Reject permanently
-      mark-tshirt-shipped: Mark T-shirt shipped
-      mark-tshirt-unshipped: Mark T-shirt not shipped
+      mark-tshirt-sent: Mark T-shirt sent
+      mark-tshirt-unsent: Mark T-shirt not sent
       open-internal-notes: Open internal notes
       historical-disabled: This application is historical, so review actions are disabled here.
       delete: Delete from our side
@@ -516,7 +516,7 @@ admin:
       application-location: Application location
       coordinates: Coordinates
       idv-status: ID verification status
-      tshirt-shipped: T-shirt shipped
+      tshirt-sent: T-shirt sent
       decision-note: Decision note
     applicant-fields:
       display-name: Display name

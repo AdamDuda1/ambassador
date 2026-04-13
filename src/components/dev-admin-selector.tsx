@@ -94,11 +94,14 @@ export function useCanShowDevAdminSelector() {
     void fetch("/api/auth/session", { cache: "no-store" })
       .then(async (response) => {
         if (!response.ok) return null;
-        return (await response.json()) as { isAdmin?: boolean };
+        const data = await response.json().catch(() => null);
+        return typeof data === "object" && data !== null && !Array.isArray(data)
+          ? Object.fromEntries(Object.entries(data))
+          : null;
       })
       .then((session) => {
         if (!isActive || !session) return;
-        setCanShow(Boolean(session.isAdmin));
+        setCanShow(session.isAdmin === true);
       })
       .catch((error) => {
         console.error("Failed to load dev admin selector session", error);

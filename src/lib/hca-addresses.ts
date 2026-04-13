@@ -15,11 +15,11 @@ type LoadUserHackClubAddressesInput = {
 export async function cacheHackClubAddresses(userId: string, addresses: HackClubAddress[]) {
   const normalizedAddresses = normalizeHackClubAddresses(addresses);
   const primaryAddress = normalizedAddresses.at(0) ?? null;
-  const primaryAddressLine1 = primaryAddress ? primaryAddress.line_1 : null;
-  const primaryAddressCity = primaryAddress ? primaryAddress.city : null;
-  const primaryAddressState = primaryAddress ? primaryAddress.state : null;
-  const primaryAddressPostalCode = primaryAddress ? primaryAddress.postal_code : null;
-  const primaryAddressCountry = primaryAddress ? primaryAddress.country : null;
+  const primaryAddressLine1 = primaryAddress?.line_1 ?? null;
+  const primaryAddressCity = primaryAddress?.city ?? null;
+  const primaryAddressState = primaryAddress?.state ?? null;
+  const primaryAddressPostalCode = primaryAddress?.postal_code ?? null;
+  const primaryAddressCountry = primaryAddress?.country ?? null;
 
   await sql`
     UPDATE users

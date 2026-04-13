@@ -4,9 +4,6 @@ import { cookies } from "next/headers";
 import sql from "@/lib/database/client";
 import { isProduction, requireEnv } from "@/lib/env";
 
-const COOKIE_NAME = "ambassador_token";
-const IMPERSONATION_COOKIE_NAME = "ambassador_impersonation";
-const IMPERSONATION_COOKIE_MAX_AGE_SECONDS = 43200;
 const SECRET = new TextEncoder().encode(requireEnv("JWT_SECRET"));
 
 export type TokenPayload = {
@@ -95,6 +92,26 @@ export async function createImpersonationToken(payload: {
   );
 }
 
+function isTokenPayloadRecord(value: unknown): value is TokenPayload {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+
+  const sub = Reflect.get(value, "sub");
+  const displayName = Reflect.get(value, "displayName");
+  const isAdmin = Reflect.get(value, "isAdmin");
+  const email = Reflect.get(value, "email");
+  const slackId = Reflect.get(value, "slackId");
+
+  return (
+    typeof sub === "string" &&
+    typeof displayName === "string" &&
+    typeof isAdmin === "boolean" &&
+    (email === undefined || typeof email === "string") &&
+    (slackId === undefined || typeof slackId === "string")
+  );
+}
+
 export async function verifyImpersonationToken(
   token: string,
 ): Promise<ImpersonationTokenPayload | null> {
@@ -106,22 +123,8 @@ export async function verifyImpersonationToken(
     !payload ||
     payload.type !== "impersonation" ||
     typeof payload.startedAt !== "string" ||
-    typeof actor !== "object" ||
-    actor === null ||
-    Array.isArray(actor) ||
-    typeof actor.sub !== "string" ||
-    typeof actor.displayName !== "string" ||
-    typeof actor.isAdmin !== "boolean" ||
-    (actor.email !== undefined && typeof actor.email !== "string") ||
-    (actor.slackId !== undefined && typeof actor.slackId !== "string") ||
-    typeof subject !== "object" ||
-    subject === null ||
-    Array.isArray(subject) ||
-    typeof subject.sub !== "string" ||
-    typeof subject.displayName !== "string" ||
-    typeof subject.isAdmin !== "boolean" ||
-    (subject.email !== undefined && typeof subject.email !== "string") ||
-    (subject.slackId !== undefined && typeof subject.slackId !== "string")
+    !isTokenPayloadRecord(actor) ||
+    !isTokenPayloadRecord(subject)
   ) {
     return null;
   }
@@ -148,7 +151,7 @@ export async function verifyImpersonationToken(
 
 export async function setSession(token: string) {
   const cookieStore = await cookies();
-  cookieStore.set(COOKIE_NAME, token, {
+  cookieStore.set("ambassador_token", token, {
     httpOnly: true,
     secure: isProduction(),
     sameSite: "lax",
@@ -159,31 +162,31 @@ export async function setSession(token: string) {
 
 export async function setImpersonationSession(token: string) {
   const cookieStore = await cookies();
-  cookieStore.set(IMPERSONATION_COOKIE_NAME, token, {
+  cookieStore.set("ambassador_impersonation", token, {
     httpOnly: true,
     secure: isProduction(),
     sameSite: "lax",
     path: "/",
-    maxAge: IMPERSONATION_COOKIE_MAX_AGE_SECONDS,
+    maxAge: 43_200,
   });
 }
 
 export async function getActorSession(): Promise<TokenPayload | null> {
   const cookieStore = await cookies();
-  const cookie = cookieStore.get(COOKIE_NAME);
+  const cookie = cookieStore.get("ambassador_token");
   if (!cookie) return null;
   return verifyToken(cookie.value);
 }
 
 export async function getSession(): Promise<SessionPayload | null> {
   const cookieStore = await cookies();
-  const actorCookie = cookieStore.get(COOKIE_NAME);
+  const actorCookie = cookieStore.get("ambassador_token");
   if (!actorCookie) return null;
 
   const actorSession = await verifyToken(actorCookie.value);
   if (!actorSession) return null;
 
-  const impersonationCookie = cookieStore.get(IMPERSONATION_COOKIE_NAME);
+  const impersonationCookie = cookieStore.get("ambassador_impersonation");
   if (!impersonationCookie) {
     return actorSession;
   }
@@ -200,7 +203,7 @@ export async function getSession(): Promise<SessionPayload | null> {
     LIMIT 1
   `).at(0);
 
-  if (!actorUser?.is_admin || impersonation.actor.sub !== actorSession.sub) {
+  if (actorUser?.is_admin !== true || impersonation.actor.sub !== actorSession.sub) {
     return actorSession;
   }
 
@@ -213,11 +216,11 @@ export async function getSession(): Promise<SessionPayload | null> {
 
 export async function clearImpersonationSession() {
   const cookieStore = await cookies();
-  cookieStore.delete(IMPERSONATION_COOKIE_NAME);
+  cookieStore.delete("ambassador_impersonation");
 }
 
 export async function clearSession() {
   const cookieStore = await cookies();
-  cookieStore.delete(COOKIE_NAME);
-  cookieStore.delete(IMPERSONATION_COOKIE_NAME);
+  cookieStore.delete("ambassador_token");
+  cookieStore.delete("ambassador_impersonation");
 }

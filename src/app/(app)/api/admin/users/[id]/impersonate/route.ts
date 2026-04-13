@@ -45,7 +45,7 @@ export async function POST(
     return Response.redirect(getSafeRedirectUrl(request, formData.get("redirectTo"), "/dashboard"));
   }
 
-  const [user] = await sql<{
+  const user = (await sql<{
     id: string;
     email: string | null;
     display_name: string | null;
@@ -56,16 +56,21 @@ export async function POST(
     FROM users
     WHERE id = ${id}
     LIMIT 1
-  `;
+  `).at(0) ?? null;
 
-  if (!user) {
+  if (user === null) {
     return Response.json({ error: "not_found" }, { status: 404 });
   }
 
   const subject: TokenPayload = {
     sub: user.id,
     email: user.email ?? undefined,
-    displayName: user.display_name?.trim() || user.email?.trim() || user.id,
+    displayName:
+      typeof user.display_name === "string" && user.display_name.trim() !== ""
+        ? user.display_name.trim()
+        : typeof user.email === "string" && user.email.trim() !== ""
+          ? user.email.trim()
+          : user.id,
     slackId: user.slack_id ?? undefined,
     isAdmin: Boolean(user.is_admin),
   };

@@ -1,9 +1,10 @@
 import { AirtableClient, AirtableError, createAirtableClient } from "@/lib/airtable";
 import {
-  getAirtableApplicationFieldId,
+  getAirtableApplicationFieldValue,
   getAirtableApplicationsTableId,
 } from "@/lib/applications/airtable";
 import {
+  type AmbassadorFieldKey,
   getAirtableBaseId,
   getAirtableFieldId,
   getAirtableFieldValue,
@@ -19,14 +20,14 @@ export function getAirtableAmbassadorsTableId() {
 }
 
 function getAirtableAmbassadorFieldId(
-  fieldKey: "onboardingComplete" | "tshirtSent",
+  fieldKey: AmbassadorFieldKey,
 ) {
   return getAirtableFieldId("ambassadors", fieldKey);
 }
 
 function getAirtableAmbassadorFieldValue(
   fields: Record<string, unknown>,
-  fieldKey: "onboardingComplete",
+  fieldKey: AmbassadorFieldKey,
 ) {
   return getAirtableFieldValue(fields, "ambassadors", fieldKey);
 }
@@ -55,12 +56,12 @@ export type AmbassadorOnboardingStatus = {
 };
 
 function getAmbassadorRecordIdsFromApplicationPayload(payload: unknown) {
-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+  if (payload === null || payload === undefined || typeof payload !== "object" || Array.isArray(payload)) {
     return [];
   }
 
-  const fields = payload as Record<string, unknown>;
-  const linkedRecordIds = fields[getAirtableApplicationFieldId("ambassadors")] ?? fields.ambassadors;
+  const fields = Object.fromEntries(Object.entries(payload));
+  const linkedRecordIds = getAirtableApplicationFieldValue(fields, "ambassadors");
 
   return Array.isArray(linkedRecordIds)
     ? linkedRecordIds.filter((item): item is string => typeof item === "string" && item.length > 0)
@@ -77,7 +78,11 @@ async function getAmbassadorRecordIds(input: {
     input.applicationAirtablePayload,
   );
 
-  if (ambassadorRecordIds.length === 0 && applicationAirtableRecordId) {
+  if (
+    ambassadorRecordIds.length === 0 &&
+    applicationAirtableRecordId !== undefined &&
+    applicationAirtableRecordId !== ""
+  ) {
     try {
       const applicationRecord = await getRecordById(
         input.client,

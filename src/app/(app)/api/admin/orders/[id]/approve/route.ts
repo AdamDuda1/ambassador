@@ -2,7 +2,7 @@ import { revalidatePath } from "next/cache";
 
 import {
   isUserAdmin,
-  setLatestApplicationTshirtShippedForUser,
+  setLatestApplicationTshirtSentForUser,
 } from "@/lib/applications/review";
 import sql from "@/lib/database/client";
 import { ensureSchema } from "@/lib/database/ensure-schema";
@@ -17,10 +17,29 @@ import {
   SHIRT_SKU_PREFIX,
 } from "@/lib/shop";
 import {
+  type HackClubAuthAddress,
   parseWarehouseOrderResponse,
   WarehouseApiClient,
   WarehouseApiError,
 } from "@/lib/warehouse";
+
+type OrderApproveRow = {
+  id: string;
+  user_id: string;
+  status: string;
+  sku: string | null;
+  variant: string | null;
+  address: HackClubAuthAddress | null;
+  warehouse_order_id: string | null;
+  warehouse_status: string | null;
+  warehouse_payload: unknown | null;
+  email: string;
+  display_name: string;
+};
+
+type OrderIdRow = {
+  id: string;
+};
 
 export async function POST(
   request: Request,
@@ -43,7 +62,7 @@ export async function POST(
   const { id } = await params;
   const formData = await request.formData();
 
-  const [order] = await sql`
+  const order = (await sql<OrderApproveRow[]>`
     SELECT o.id, o.user_id, o.status, o.sku, o.variant, o.address, o.warehouse_order_id,
            o.warehouse_status, o.warehouse_payload,
            u.email, u.display_name
@@ -51,18 +70,18 @@ export async function POST(
     JOIN users u ON u.id = o.user_id
     WHERE o.id = ${id}
     LIMIT 1
-  `;
-  if (!order) {
+  `).at(0) ?? null;
+  if (order === null) {
     return Response.json({ error: "not_found" }, { status: 404 });
   }
 
-  const [latestOrder] = await sql`
+  const latestOrder = (await sql<OrderIdRow[]>`
     SELECT id
     FROM orders
     WHERE user_id = ${order.user_id}
     ORDER BY created_at DESC, id DESC
     LIMIT 1
-  `;
+  `).at(0) ?? null;
 
   if (latestOrder?.id !== order.id) {
     return Response.json({ error: "historical_order" }, { status: 409 });
@@ -76,7 +95,7 @@ export async function POST(
   ) {
     return Response.json({ error: "invalid_order_status" }, { status: 409 });
   }
-  if (!order.sku || !order.address) {
+  if (order.sku === null || order.sku === "" || order.address === null) {
     return Response.json({ error: "invalid_order" }, { status: 400 });
   }
 
@@ -87,7 +106,7 @@ export async function POST(
     order.warehouse_status ?? existingWarehouseOrder?.status ?? null;
 
   try {
-    if (existingWarehouseOrderId) {
+    if (existingWarehouseOrderId !== null && existingWarehouseOrderId !== "") {
       await sql`
         UPDATE orders
         SET status = ${ORDER_STATUS_APPROVED},
@@ -119,8 +138,8 @@ export async function POST(
       await sql`
         UPDATE orders
         SET status = ${ORDER_STATUS_APPROVED},
-            warehouse_order_id = ${result.id ?? null},
-            warehouse_status = ${result.status ?? null},
+            warehouse_order_id = ${result.id},
+            warehouse_status = ${result.status},
             warehouse_payload = CAST(${JSON.stringify(result)} AS JSONB),
             note = NULL,
             internal_fail_reason = NULL,
@@ -160,7 +179,7 @@ export async function POST(
 
   if (order.sku.startsWith(SHIRT_SKU_PREFIX)) {
     try {
-      await setLatestApplicationTshirtShippedForUser(order.user_id, true);
+      await setLatestApplicationTshirtSentForUser(order.user_id, true);
     } catch (error) {
       console.error(`[orders] unable to sync tshirt-sent for order ${order.id}`, error);
     }

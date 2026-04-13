@@ -35,11 +35,11 @@ import {
 } from "@/lib/posters/types";
 
 function isPosterStyle(value: string | null | undefined): value is PosterStyle {
-  return POSTER_STYLES.includes((value ?? "") as PosterStyle);
+  return value === "color" || value === "bw" || value === "printer_efficient";
 }
 
 function isPosterGroupCharset(value: string | null | undefined): value is PosterGroupCharset {
-  return POSTER_GROUP_CHARSETS.includes((value ?? "") as PosterGroupCharset);
+  return value === "alphanumeric" || value === "numeric" || value === "alpha";
 }
 
 async function persistPosterDecision(input: {
@@ -357,8 +357,8 @@ export async function scanPosterGroupProof(input: {
     };
   }
 
-  const fallbackPoster = pendingGroupPosters[0] ?? null;
-  if (!fallbackPoster) {
+  const fallbackPoster = pendingGroupPosters.at(0) ?? null;
+  if (fallbackPoster === null) {
     return {
       status: "no_match",
       detectedQrCodes,

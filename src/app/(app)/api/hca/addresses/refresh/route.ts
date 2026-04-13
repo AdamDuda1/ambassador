@@ -7,6 +7,10 @@ import { getSession } from "@/lib/session";
 import { fetchHackClubAddresses } from "@/lib/auth";
 import { normalizeHackClubAddresses } from "@/lib/settings";
 
+type UserTokenRow = {
+  hca_access_token: string | null;
+};
+
 export async function POST(request: Request) {
   if (!isSameOriginRequest(request)) {
     return Response.json({ error: "forbidden" }, { status: 403 });
@@ -19,14 +23,14 @@ export async function POST(request: Request) {
 
   await ensureSchema();
 
-  const [user] = await sql`
+  const user = (await sql<UserTokenRow[]>`
     SELECT hca_access_token
     FROM users
     WHERE id = ${session.sub}
     LIMIT 1
-  `;
+  `).at(0) ?? null;
 
-  if (!user) {
+  if (user === null) {
     return Response.json({ error: "unauthorized" }, { status: 401 });
   }
 

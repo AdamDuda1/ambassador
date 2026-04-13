@@ -32,6 +32,10 @@ type OrderRow = {
   user_slack_name: string | null;
 };
 
+type CountRow = {
+  total: number;
+};
+
 export async function generateMetadata(): Promise<Metadata> {
   return getTranslatedPageMetadata("admin.orders.metadata.title");
 }
@@ -50,7 +54,7 @@ export default async function AdminOrdersPage({
   const searchFilter = search ? `%${search}%` : null;
 
   const [orders, countResult] = await Promise.all([
-    sql`
+    sql<OrderRow[]>`
       SELECT o.id, o.status, o.sku, o.variant, o.address, o.note, o.created_at,
              u.display_name AS user_name, u.email AS user_email,
              u.slack_id AS user_slack_id, u.slack_name AS user_slack_name
@@ -66,8 +70,8 @@ export default async function AdminOrdersPage({
         CASE WHEN o.status = ${ORDER_STATUS_PENDING} THEN 0 ELSE 1 END,
         o.created_at DESC
       LIMIT ${20} OFFSET ${offset}
-    ` as unknown as OrderRow[],
-    sql`
+    `,
+    sql<CountRow[]>`
       SELECT COUNT(*)::int AS total
       FROM orders o
       LEFT JOIN users u ON u.id = o.user_id
@@ -80,7 +84,7 @@ export default async function AdminOrdersPage({
     `,
   ]);
 
-  const totalCount = (countResult[0] as { total: number })?.total ?? 0;
+  const totalCount = countResult.at(0)?.total ?? 0;
 
   return (
     <div className="space-y-6">

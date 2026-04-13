@@ -24,7 +24,94 @@ import { ensureSchema } from "@/lib/database/ensure-schema";
 import { formatDate, formatDateTime, joinNonEmpty } from "@/lib/format";
 import { readHcaAccessToken } from "@/lib/hca-access-token";
 import { ensureUserAddressSchema } from "@/lib/database/user-address-schema";
-import type { HackClubAddress } from "@/lib/settings";
+import { normalizeHackClubAddresses } from "@/lib/settings";
+
+type ApplicationDetailRow = {
+  id: string;
+  user_id: string | null;
+  status: string;
+  name: string | null;
+  applicant_email: string | null;
+  applicant_slack_id: string | null;
+  applicant_hca_id: string | null;
+  applicant_phone: string | null;
+  date_of_birth: string | null;
+  address_line_1: string | null;
+  address_line_2: string | null;
+  address_city: string | null;
+  address_state: string | null;
+  address_zip: string | null;
+  address_country: string | null;
+  github_url: string | null;
+  portfolio_url: string | null;
+  application_first_thing_do: string | null;
+  application_best_place_poster: string | null;
+  idv_status: string | null;
+  tshirt_sent: boolean | null;
+  airtable_record_id: string | null;
+  submitted_ip: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  city: string | null;
+  region: string | null;
+  country_code: string | null;
+  country_name: string | null;
+  decision_note: string | null;
+  rejection_reason: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  reviewed_by: string | null;
+  latest_application_id: string;
+  user_name: string | null;
+  user_email: string | null;
+  hca_first_name: string | null;
+  hca_last_name: string | null;
+  hca_addresses: unknown;
+  hca_access_token: string | null;
+  user_slack_id: string | null;
+  user_slack_name: string | null;
+  user_slack_avatar_url: string | null;
+  user_hca_id: string | null;
+  verification_status: string | null;
+  user_last_ip: string | null;
+  user_city: string | null;
+  user_region: string | null;
+  user_country_code: string | null;
+  user_country_name: string | null;
+  user_postal_code: string | null;
+  user_timezone: string | null;
+  user_org: string | null;
+  user_created_at: string | null;
+  reviewed_by_name: string | null;
+};
+
+type ApplicationHistoryRow = {
+  id: string;
+  status: string;
+  name: string | null;
+  decision_note: string | null;
+  created_at: string;
+};
+
+type CountRow = { count: number };
+
+type VisitRow = {
+  id: string;
+  ip: string;
+  visit_type: string;
+  city: string | null;
+  region: string | null;
+  country_code: string | null;
+  org: string | null;
+  created_at: string;
+};
+
+type OrderRow = {
+  id: string;
+  status: string;
+  created_at: string;
+};
 
 export async function generateMetadata(): Promise<Metadata> {
   return getTranslatedPageMetadata("admin.application-detail.page-title");
@@ -50,13 +137,13 @@ export default async function AdminApplicationDetailPage({
   await ensureSchema();
   await ensureUserAddressSchema();
 
-  const [application] = await sql`
+  const application = (await sql<ApplicationDetailRow[]>`
     SELECT a.id, a.user_id, a.status, a.name, a.applicant_email, a.applicant_slack_id,
            a.applicant_hca_id,
            a.applicant_phone, a.date_of_birth, a.address_line_1, a.address_line_2,
            a.address_city, a.address_state, a.address_zip, a.address_country,
            a.github_url, a.portfolio_url, a.application_first_thing_do,
-           a.application_best_place_poster, a.idv_status, a.tshirt_shipped, a.airtable_record_id,
+           a.application_best_place_poster, a.idv_status, a.tshirt_shipped AS tshirt_sent, a.airtable_record_id,
            a.submitted_ip, a.latitude, a.longitude, a.city, a.region, a.country_code, a.country_name,
            a.decision_note, a.rejection_reason, a.reviewed_at, a.created_at, a.updated_at, a.reviewed_by,
            COALESCE(latest.id, a.id) AS latest_application_id,
@@ -74,15 +161,16 @@ export default async function AdminApplicationDetailPage({
     LEFT JOIN LATERAL (
       SELECT id
       FROM applications
-      WHERE user_id = a.user_id
+      WHERE (a.user_id IS NOT NULL AND user_id = a.user_id)
+         OR (a.user_id IS NULL AND a.applicant_email IS NOT NULL AND user_id IS NULL AND LOWER(applicant_email) = LOWER(a.applicant_email))
       ORDER BY created_at DESC, id DESC
       LIMIT 1
     ) latest ON true
     WHERE a.id = ${id}
     LIMIT 1
-  `;
+  `).at(0) ?? null;
 
-  if (!application) notFound();
+  if (application === null) notFound();
 
   const storedAddresses = Array.isArray(application.hca_addresses)
     ? application.hca_addresses.filter(
@@ -101,30 +189,37 @@ export default async function AdminApplicationDetailPage({
         return [];
       })
     : [];
-  const addresses = (liveAddresses.length > 0 ? liveAddresses : storedAddresses) as HackClubAddress[];
+  const addresses = normalizeHackClubAddresses(liveAddresses.length > 0 ? liveAddresses : storedAddresses);
 
   const [history, visitCountResult, visits, orders] = await Promise.all([
     application.user_id
-      ? sql`
+      ? sql<ApplicationHistoryRow[]>`
           SELECT id, status, name, decision_note, created_at
           FROM applications
           WHERE user_id = ${application.user_id}
           ORDER BY created_at DESC, id DESC
         `
-      : sql`
-          SELECT id, status, name, decision_note, created_at
-          FROM applications
-          WHERE id = ${application.id}
-        `,
+      : application.applicant_email
+        ? sql<ApplicationHistoryRow[]>`
+            SELECT id, status, name, decision_note, created_at
+            FROM applications
+            WHERE user_id IS NULL AND LOWER(applicant_email) = LOWER(${application.applicant_email})
+            ORDER BY created_at DESC, id DESC
+          `
+        : sql<ApplicationHistoryRow[]>`
+            SELECT id, status, name, decision_note, created_at
+            FROM applications
+            WHERE id = ${application.id}
+          `,
     application.user_id
-      ? sql`
+      ? sql<CountRow[]>`
           SELECT COUNT(*)::int AS count
           FROM ip_visits
           WHERE user_id = ${application.user_id}
-        `.then((rows) => rows[0]?.count ?? 0)
+        `.then((rows) => rows.at(0)?.count ?? 0)
       : Promise.resolve(0),
     application.user_id
-      ? sql`
+      ? sql<VisitRow[]>`
           SELECT id, ip, visit_type, city, region, country_code, org, created_at
           FROM ip_visits
           WHERE user_id = ${application.user_id}
@@ -134,7 +229,7 @@ export default async function AdminApplicationDetailPage({
         `
       : Promise.resolve([]),
     application.user_id
-      ? sql`
+      ? sql<OrderRow[]>`
           SELECT id, status, created_at
           FROM orders
           WHERE user_id = ${application.user_id}
@@ -282,25 +377,25 @@ export default async function AdminApplicationDetailPage({
             ) : null}
 
             <form
-              action={`/api/admin/applications/${application.id}/tshirt-shipped`}
+              action={`/api/admin/applications/${application.id}/tshirt-sent`}
               method="POST"
               className="max-w-xl space-y-3"
             >
               <input type="hidden" name="redirectTo" value={`/admin/applications/${application.id}`} />
               <input
                 type="hidden"
-                name="shipped"
-                value={application.tshirt_shipped ? "false" : "true"}
+                name="sent"
+                value={application.tshirt_sent === true ? "false" : "true"}
               />
               <button
                 className={buttonVariants({
-                  variant: application.tshirt_shipped ? "default" : "success",
+                  variant: application.tshirt_sent === true ? "default" : "success",
                   size: "app",
                 })}
               >
-                {application.tshirt_shipped
-                  ? t("admin.application-detail.actions.mark-tshirt-unshipped")
-                  : t("admin.application-detail.actions.mark-tshirt-shipped")}
+                {application.tshirt_sent === true
+                  ? t("admin.application-detail.actions.mark-tshirt-unsent")
+                  : t("admin.application-detail.actions.mark-tshirt-sent")}
               </button>
             </form>
 
@@ -394,8 +489,8 @@ export default async function AdminApplicationDetailPage({
         />
         <DetailFieldRow label={t("admin.application-detail.metadata.idv-status")} value={application.idv_status} />
         <DetailFieldRow
-          label={t("admin.application-detail.metadata.tshirt-shipped")}
-          value={application.tshirt_shipped ? t("common.yes") : t("common.no")}
+          label={t("admin.application-detail.metadata.tshirt-sent")}
+          value={application.tshirt_sent === true ? t("common.yes") : t("common.no")}
         />
         <DetailFieldRow
           label={t("admin.application-detail.metadata.decision-note")}

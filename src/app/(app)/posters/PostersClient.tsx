@@ -131,14 +131,8 @@ export function PostersClient({
   }, [availableStyles, posterType]);
 
   const refresh = useCallback(async () => {
-    const response = await fetch("/api/posters");
-    if (!response.ok) {
-      setError(t("errors.load-failed"));
-      return;
-    }
-    const next = (await response.json()) as ClientPosterData;
-    setData(next);
-  }, [t]);
+    window.location.reload();
+  }, []);
 
   const createPoster = useCallback(async () => {
     if (!campaignSlug) return;
@@ -610,11 +604,34 @@ function VerifyModal({
           : `/api/posters/${target.poster.id}/proof`;
 
       const response = await fetch(url, { method: "POST", body: formData });
-      const payload = (await response.json()) as ScanResult | { error?: string };
+      const data = await response.json().catch(() => null);
+      const payload: Record<string, unknown> | null =
+        typeof data === "object" && data !== null && !Array.isArray(data)
+          ? Object.fromEntries(Object.entries(data))
+          : null;
       if (!response.ok) {
-        throw new Error((payload as { error?: string }).error || t("errors.upload-failed"));
+        throw new Error(typeof payload?.error === "string" ? payload.error : t("errors.upload-failed"));
       }
-      setResult(payload as ScanResult);
+      const status = payload?.status;
+      const detectedQrCodes = Array.isArray(payload?.detectedQrCodes)
+        ? payload.detectedQrCodes.filter((code): code is string => typeof code === "string")
+        : null;
+      const message = payload?.message;
+      if (
+        status !== "success" &&
+        status !== "auto_matched" &&
+        status !== "already_verified" &&
+        status !== "in_review" &&
+        status !== "no_qr" &&
+        status !== "no_match" &&
+        status !== "wrong_group"
+      ) {
+        throw new Error(t("errors.upload-failed"));
+      }
+      if (detectedQrCodes === null || typeof message !== "string") {
+        throw new Error(t("errors.upload-failed"));
+      }
+      setResult({ status, detectedQrCodes, message });
     } catch (err) {
       setError(err instanceof Error ? err.message : t("errors.upload-failed"));
     } finally {

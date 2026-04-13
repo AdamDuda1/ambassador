@@ -10,6 +10,8 @@ import { getTranslatedPageMetadata } from "@/i18n/metadata";
 import sql from "@/lib/database/client";
 import { ensureSchema } from "@/lib/database/ensure-schema";
 
+type CountRow = { total: number };
+
 export async function generateMetadata(): Promise<Metadata> {
   return getTranslatedPageMetadata("admin.users-list.metadata.title");
 }
@@ -54,7 +56,7 @@ export default async function AdminUsersPage({
       ORDER BY u.created_at DESC
       LIMIT ${20} OFFSET ${offset}
     `,
-    sql`
+    sql<CountRow[]>`
       SELECT COUNT(*)::int AS total
       FROM users u
       WHERE (${searchFilter}::text IS NULL OR (
@@ -66,7 +68,7 @@ export default async function AdminUsersPage({
     `,
   ]);
 
-  const totalCount = countResult[0]?.total ?? 0;
+  const totalCount = countResult.at(0)?.total ?? 0;
 
   return (
     <div className="space-y-6">

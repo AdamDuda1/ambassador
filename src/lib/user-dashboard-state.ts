@@ -12,9 +12,7 @@ export type UserManualDashboardState =
 export function isUserManualDashboardState(
   value: string | null | undefined,
 ): value is UserManualDashboardState {
-  return USER_MANUAL_DASHBOARD_STATES.includes(
-    value as UserManualDashboardState,
-  );
+  return value === "approved" || value === "rejected" || value === "banned";
 }
 
 export function getUserManualDashboardStateLabel(

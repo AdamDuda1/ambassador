@@ -14,7 +14,7 @@ export default async function AdminLayout({
   if (!session) unauthorized();
 
   const user = await getPosterAccessState(session.sub);
-  if (!user?.is_admin) forbidden();
+  if (user === null || user.is_admin !== true) forbidden();
   const showPostersLink = canAccessPosters({
     latestApplicationStatus: user.latest_application_status ?? null,
     manualDashboardState: user.manual_dashboard_state ?? null,
@@ -24,7 +24,7 @@ export default async function AdminLayout({
     <div className="page-shell">
       <Navbar
         isAdmin
-        balanceCents={user?.balance_cents ?? 0}
+        balanceCents={user.balance_cents ?? 0}
         showPostersLink={showPostersLink}
       />
       <div className="mx-auto max-w-5xl px-6 py-8">

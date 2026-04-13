@@ -19,17 +19,17 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const session = await requirePosterSession();
-    const body = (await request.json()) as {
-      campaignSlug?: string;
-      posterType?: string;
-      charset?: string;
-    };
+    const body = await request.json();
+    const payload: Record<string, unknown> | null =
+      typeof body === "object" && body !== null && !Array.isArray(body)
+        ? Object.fromEntries(Object.entries(body))
+        : null;
 
     const poster = await createSinglePosterForUser({
       userId: session.sub,
-      campaignSlug: body.campaignSlug,
-      posterType: body.posterType,
-      charset: body.charset,
+      campaignSlug: typeof payload?.campaignSlug === "string" ? payload.campaignSlug : undefined,
+      posterType: typeof payload?.posterType === "string" ? payload.posterType : undefined,
+      charset: typeof payload?.charset === "string" ? payload.charset : undefined,
     });
 
     return Response.json({ poster }, { status: 201 });

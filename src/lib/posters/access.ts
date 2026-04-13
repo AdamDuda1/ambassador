@@ -11,7 +11,7 @@ export type PosterAccessState = {
 };
 
 export async function getPosterAccessState(userId: string): Promise<PosterAccessState | null> {
-  const [user] = await sql<PosterAccessState[]>`
+  const user = (await sql<PosterAccessState[]>`
     SELECT balance_cents, is_admin, posters_enabled, manual_dashboard_state,
            (
              SELECT status
@@ -23,9 +23,9 @@ export async function getPosterAccessState(userId: string): Promise<PosterAccess
     FROM users
     WHERE id = ${userId}
     LIMIT 1
-  `;
+  `).at(0) ?? null;
 
-  return user ?? null;
+  return user;
 }
 
 export function canAccessPosters(input: {

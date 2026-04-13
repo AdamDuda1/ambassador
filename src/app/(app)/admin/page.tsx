@@ -60,9 +60,13 @@ export default async function AdminDashboard({
   searchParams: Promise<{ range?: string }>;
 }) {
   const [t, locale, query] = await Promise.all([getTranslations(), getLocale(), searchParams]);
-  const activeRange = query.range && query.range in activityRangeDays
-    ? query.range as ActivityRange
-    : "14d";
+  const activeRange: ActivityRange =
+    query.range === "7d" ||
+    query.range === "14d" ||
+    query.range === "30d" ||
+    query.range === "90d"
+      ? query.range
+      : "14d";
   const rangeDays = activityRangeDays[activeRange];
   await ensureSchema();
   const numberFormatter = new Intl.NumberFormat(locale);

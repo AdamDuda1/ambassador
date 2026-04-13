@@ -53,7 +53,7 @@ export default async function SettingsPage() {
   }
 
   const canAccessAdmin = Boolean(session.impersonator) || Boolean(settingsUser.is_admin ?? session.isAdmin);
-  const showPostersLink = canAccessPosters({
+  const showPostersLink = posterAccessState !== null && canAccessPosters({
     latestApplicationStatus: posterAccessState.latest_application_status,
     manualDashboardState: posterAccessState.manual_dashboard_state,
   });

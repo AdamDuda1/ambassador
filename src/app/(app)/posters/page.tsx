@@ -33,7 +33,7 @@ export default async function PostersPage() {
     forbidden();
   }
 
-  if (!user?.posters_enabled) {
+  if (user === null || user.posters_enabled !== true) {
     return (
       <main className="page-shell">
         <Navbar
@@ -56,7 +56,7 @@ export default async function PostersPage() {
     <main className="page-shell">
       <Navbar
         isAdmin={canAccessAdmin}
-        balanceCents={user?.balance_cents ?? 0}
+        balanceCents={user.balance_cents ?? 0}
         showPostersLink
       />
       <div className="mx-auto max-w-5xl px-6 py-12">

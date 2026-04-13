@@ -1,5 +1,3 @@
-const AIRTABLE_API_BASE_URL = "https://api.airtable.com/v0"
-
 export type AirtableRecord<TFields extends Record<string, unknown> = Record<string, unknown>> = {
   id: string
   createdTime: string
@@ -55,7 +53,7 @@ type AirtableReadOptions = AirtableCallOptions & {
 function requireAirtablePat() {
   const token = process.env.AIRTABLE_PAT?.trim()
 
-  if (!token) {
+  if (token === undefined || token === "") {
     throw new Error("AIRTABLE_PAT is not set")
   }
 
@@ -104,7 +102,10 @@ function sanitizeAirtableValue(value: unknown): unknown {
 }
 
 export function sanitizeAirtableFields<TFields extends Record<string, unknown>>(fields: TFields) {
-  return sanitizeAirtableValue(fields) as Partial<TFields>
+  const sanitized = sanitizeAirtableValue(fields)
+  return typeof sanitized === "object" && sanitized !== null && !Array.isArray(sanitized)
+    ? Object.fromEntries(Object.entries(sanitized))
+    : {}
 }
 
 export function escapeAirtableFormulaValue(value: string | number | boolean) {
@@ -125,7 +126,7 @@ export function buildAirtableEqualsFormula(fieldName: string, value: string | nu
 export function createAirtableClient(baseId: string) {
   const token = process.env.AIRTABLE_PAT?.trim()
 
-  if (!token) return null
+  if (token === undefined || token === "") return null
 
   return new AirtableClient({
     baseId,
@@ -140,8 +141,10 @@ export class AirtableClient {
 
   constructor(options: AirtableClientOptions) {
     this.baseId = options.baseId
-    this.token = options.token?.trim() || requireAirtablePat()
-    this.baseUrl = options.baseUrl?.replace(/\/$/, "") || AIRTABLE_API_BASE_URL
+    const token = options.token?.trim()
+    this.token = token !== undefined && token !== "" ? token : requireAirtablePat()
+    const baseUrl = options.baseUrl?.replace(/\/$/, "")
+    this.baseUrl = baseUrl !== undefined && baseUrl !== "" ? baseUrl : "https://api.airtable.com/v0"
   }
 
   async listRecords<TFields extends Record<string, unknown>>(
@@ -152,12 +155,14 @@ export class AirtableClient {
     const { returnFieldsByFieldId, ...callOptions } = requestOptions
     const query = new URLSearchParams()
 
-    if (options.view) query.set("view", options.view)
-    if (options.maxRecords) query.set("maxRecords", String(options.maxRecords))
-    if (options.pageSize) query.set("pageSize", String(options.pageSize))
-    if (options.filterByFormula) query.set("filterByFormula", options.filterByFormula)
-    if (options.offset) query.set("offset", options.offset)
-    if (returnFieldsByFieldId) query.set("returnFieldsByFieldId", "true")
+    if (options.view !== undefined && options.view !== "") query.set("view", options.view)
+    if (options.maxRecords !== undefined) query.set("maxRecords", String(options.maxRecords))
+    if (options.pageSize !== undefined) query.set("pageSize", String(options.pageSize))
+    if (options.filterByFormula !== undefined && options.filterByFormula !== "") {
+      query.set("filterByFormula", options.filterByFormula)
+    }
+    if (options.offset !== undefined && options.offset !== "") query.set("offset", options.offset)
+    if (returnFieldsByFieldId === true) query.set("returnFieldsByFieldId", "true")
 
     options.fields?.forEach((field) => query.append("fields[]", field))
     options.sort?.forEach((sort, index) => {
@@ -182,7 +187,7 @@ export class AirtableClient {
 
     return this.request<AirtableRecord<TFields>>(`${table}/${recordId}`, {
       method: "GET",
-      query: returnFieldsByFieldId
+      query: returnFieldsByFieldId === true
         ? new URLSearchParams({ returnFieldsByFieldId: "true" })
         : undefined,
       cache: "no-store",
@@ -234,9 +239,9 @@ export class AirtableClient {
     })
 
     const text = await response.text()
-    let body: unknown = null
+    let body = null
 
-    if (text) {
+    if (text !== "") {
       try {
         body = JSON.parse(text)
       } catch {
@@ -244,13 +249,13 @@ export class AirtableClient {
       }
     }
 
-    if (!response.ok) {
+    if (response.ok !== true) {
       throw new AirtableError(`Airtable request failed with status ${response.status}`, {
         status: response.status,
         body,
       })
     }
 
-    return body as TResult
+    return body
   }
 }

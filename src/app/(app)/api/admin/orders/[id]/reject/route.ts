@@ -7,6 +7,15 @@ import { getSafeRedirectUrl, isSameOriginRequest } from "@/lib/http";
 import { getActorSession } from "@/lib/session";
 import { ORDER_STATUS_REJECTED } from "@/lib/shop";
 
+type OrderRow = {
+  id: string;
+  user_id: string;
+};
+
+type OrderIdRow = {
+  id: string;
+};
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -27,22 +36,23 @@ export async function POST(
 
   const { id } = await params;
   const formData = await request.formData();
-  const note = (formData.get("note") as string | null)?.trim() || null;
+  const rawNote = formData.get("note");
+  const note = typeof rawNote === "string" ? rawNote.trim() || null : null;
 
-  const [order] = await sql`
+  const order = (await sql<OrderRow[]>`
     SELECT id, user_id FROM orders WHERE id = ${id} LIMIT 1
-  `;
-  if (!order) {
+  `).at(0) ?? null;
+  if (order === null) {
     return Response.json({ error: "not_found" }, { status: 404 });
   }
 
-  const [latestOrder] = await sql`
+  const latestOrder = (await sql<OrderIdRow[]>`
     SELECT id
     FROM orders
     WHERE user_id = ${order.user_id}
     ORDER BY created_at DESC, id DESC
     LIMIT 1
-  `;
+  `).at(0) ?? null;
 
   if (latestOrder?.id !== order.id) {
     return Response.json({ error: "historical_order" }, { status: 409 });

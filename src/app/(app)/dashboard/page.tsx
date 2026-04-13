@@ -192,7 +192,7 @@ export default async function DashboardPage({
     canUseShirts,
   };
   const baseResolved = resolveState({ ...stateInput, activeDevState: null });
-  const selectedDevState = isDevState(devState) ? devState : null;
+  const selectedDevState = devState !== undefined && isDevState(devState) ? devState : null;
   const resolved = canUseSelector && selectedDevState !== null
     ? resolveState({ ...stateInput, activeDevState: selectedDevState })
     : baseResolved;
@@ -385,10 +385,10 @@ function resolveState({
   }
 
   const resolvedRegion = resolveAmbassadorRegion(
-    user?.ambassador_region,
-    user?.hca_country,
-    user?.country_name,
-    user?.country_code,
+    user?.ambassador_region ?? null,
+    user?.hca_country ?? null,
+    user?.country_name ?? null,
+    user?.country_code ?? null,
   );
   const manualDashboardStateValue = user?.manual_dashboard_state ?? null;
   const manualDashboardState = isUserManualDashboardState(manualDashboardStateValue)

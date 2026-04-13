@@ -1,9 +1,6 @@
 import { syncAirtableApplicationsToPostgres } from "@/lib/applications/sync";
 import { ensureSchema } from "@/lib/database/ensure-schema";
 
-const DEFAULT_INTERVAL_MS = 60_000;
-const DEFAULT_TIMEOUT_MS = 15_000;
-
 const LEGACY_ENV_KEYS = {
   intervalMs: "DEV_AIRTABLE_SYNC_INTERVAL_MS",
   timeoutMs: "DEV_AIRTABLE_SYNC_TIMEOUT_MS",
@@ -14,7 +11,7 @@ declare global {
 }
 
 function isEnabled(value: string | undefined, fallback: boolean) {
-  if (!value) return fallback;
+  if (value === undefined || value === "") return fallback;
 
   const normalized = value.trim().toLowerCase();
   if (["0", "false", "no", "off"].includes(normalized)) return false;
@@ -25,10 +22,10 @@ function isEnabled(value: string | undefined, fallback: boolean) {
 
 function readStringEnv(name: string, legacyName?: string) {
   const value = process.env[name]?.trim();
-  if (value) return value;
+  if (value !== undefined && value !== "") return value;
 
-  const legacyValue = legacyName ? process.env[legacyName]?.trim() : "";
-  if (legacyValue) {
+  const legacyValue = legacyName !== undefined ? process.env[legacyName]?.trim() ?? "" : "";
+  if (legacyValue !== "") {
     console.warn(`[airtable-sync] ${legacyName} is deprecated. Use ${name} instead.`);
     return legacyValue;
   }
@@ -69,7 +66,7 @@ async function runSync(timeoutMs: number) {
 }
 
 export function startAirtableSyncScheduler() {
-  if (globalThis.__airtableSyncSchedulerStarted) {
+  if (globalThis.__airtableSyncSchedulerStarted === true) {
     return;
   }
 
@@ -80,7 +77,8 @@ export function startAirtableSyncScheduler() {
     return;
   }
 
-  if (!process.env.AIRTABLE_PAT?.trim()) {
+  const airtablePat = process.env.AIRTABLE_PAT?.trim();
+  if (airtablePat === undefined || airtablePat === "") {
     console.log("[airtable-sync] disabled because AIRTABLE_PAT is not set");
     return;
   }
@@ -88,12 +86,12 @@ export function startAirtableSyncScheduler() {
   const intervalMs = (() => {
     const value = readStringEnv("AIRTABLE_SYNC_INTERVAL_MS", LEGACY_ENV_KEYS.intervalMs);
     const parsed = Number.parseInt(value, 10);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_INTERVAL_MS;
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 60_000;
   })();
   const timeoutMs = (() => {
     const value = readStringEnv("AIRTABLE_SYNC_TIMEOUT_MS", LEGACY_ENV_KEYS.timeoutMs);
     const parsed = Number.parseInt(value, 10);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_TIMEOUT_MS;
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 15_000;
   })();
 
   let inFlight = false;

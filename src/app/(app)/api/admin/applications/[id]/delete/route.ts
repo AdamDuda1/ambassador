@@ -5,6 +5,12 @@ import { ensureSchema } from "@/lib/database/ensure-schema";
 import { getActorSession } from "@/lib/session";
 import sql from "@/lib/database/client";
 
+type DeletedApplicationRow = {
+  id: string;
+  user_id: string | null;
+  status: string | null;
+};
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -26,13 +32,13 @@ export async function POST(
   const { id } = await params;
   const formData = await request.formData();
 
-  const [deleted] = await sql`
+  const deleted = (await sql<DeletedApplicationRow[]>`
     DELETE FROM applications
     WHERE id = ${id}
     RETURNING id, user_id, status
-  `;
+  `).at(0) ?? null;
 
-  if (!deleted) {
+  if (deleted === null) {
     return Response.json({ error: "not_found" }, { status: 404 });
   }
 

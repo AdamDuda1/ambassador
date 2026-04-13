@@ -88,7 +88,7 @@ export default function Hero() {
         role="presentation"
         className="w-96 max-lg:-mb-16 h-auto"
         placeholder="blur"
-        preload
+        priority
         sizes="(max-width: 640px) calc(100vw - 6rem), 24rem"
       />
     </div>

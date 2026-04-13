@@ -2,18 +2,26 @@ import sql from "@/lib/database/client";
 import { ensureSchema } from "@/lib/database/ensure-schema";
 import { getSession } from "@/lib/session";
 
+type ApplicationRow = {
+  id: string;
+  status: string;
+  name: string | null;
+  date_of_birth: string | null;
+  created_at: string;
+};
+
 export async function GET() {
   const session = await getSession();
   if (!session) return Response.json({ error: "unauthorized" }, { status: 401 });
   await ensureSchema();
 
-  const [application] = await sql`
+  const application = (await sql<ApplicationRow[]>`
     SELECT id, status, name, date_of_birth, created_at
     FROM applications WHERE user_id = ${session.sub}
     ORDER BY created_at DESC LIMIT 1
-  `;
+  `).at(0) ?? null;
 
-  return Response.json({ application: application ?? null });
+  return Response.json({ application });
 }
 
 export async function POST() {

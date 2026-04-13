@@ -33,9 +33,29 @@ import { normalizeHackClubAddresses } from "@/lib/settings";
 
 type AdminUserRow = {
   id: string;
+  hca_id: string | null;
+  email: string | null;
+  hca_first_name: string | null;
+  hca_last_name: string | null;
+  verification_status: string | null;
+  is_admin: boolean | null;
+  last_ip: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  city: string | null;
+  region: string | null;
+  country_code: string | null;
+  country_name: string | null;
+  postal_code: string | null;
+  timezone: string | null;
+  org: string | null;
   hca_addresses: unknown;
   hca_access_token: string | null;
+  posters_enabled: boolean | null;
   permanently_rejected_at: string | null;
+  permanent_rejection_note: string | null;
+  created_at: string;
+  updated_at: string;
   manual_dashboard_state: string | null;
   slack_id: string | null;
   slack_name: string | null;
@@ -300,7 +320,7 @@ export default async function AdminUserDetailPage({
             </form>
           ) : null}
 
-          {!user.is_admin ? (
+          {user.is_admin !== true ? (
             <ConfirmSubmitForm
               action={`/api/admin/users/${user.id}/make-admin`}
               method="POST"
@@ -445,7 +465,7 @@ export default async function AdminUserDetailPage({
               type="checkbox"
               name="postersEnabled"
               value="true"
-              defaultChecked={Boolean(user.posters_enabled)}
+              defaultChecked={user.posters_enabled === true}
               className="h-4 w-4 accent-primary"
             />
             <span className="font-body text-sm text-white">
@@ -590,8 +610,8 @@ export default async function AdminUserDetailPage({
           mono
         />
         <DetailFieldRow label={t("admin.user-detail.profile-fields.last-seen-ip")} value={user.last_ip} mono />
-        <DetailFieldRow label={t("admin.user-detail.profile-fields.admin")} value={user.is_admin ? t("common.yes") : t("common.no")} />
-        <DetailFieldRow label={t("admin.user-detail.profile-fields.posters-enabled")} value={user.posters_enabled ? t("common.yes") : t("common.no")} />
+        <DetailFieldRow label={t("admin.user-detail.profile-fields.admin")} value={user.is_admin === true ? t("common.yes") : t("common.no")} />
+        <DetailFieldRow label={t("admin.user-detail.profile-fields.posters-enabled")} value={user.posters_enabled === true ? t("common.yes") : t("common.no")} />
         <DetailFieldRow label={t("admin.user-detail.profile-fields.manual-dashboard-state")} value={manualDashboardStateLabel} />
         <DetailFieldRow label={t("admin.user-detail.profile-fields.created")} value={formatDateTime(user.created_at, locale)} />
         <DetailFieldRow label={t("admin.user-detail.profile-fields.updated")} value={formatDateTime(user.updated_at, locale)} />

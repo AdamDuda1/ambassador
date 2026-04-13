@@ -26,9 +26,9 @@ export function canShowDevAdminSelector(isAdmin: boolean) {
 }
 
 export function isDevState(value: string): value is DevState {
-  return DEV_STATES.has(value as DevState);
+  return value === "apply" || value === "ineligible" || value === "pending-checks" || value === "pending" || value === "approved" || value === "rejected" || value === "banned";
 }
 
 export function isErrorCode(value: string): value is ErrorCode {
-  return ERROR_CODES.has(value as ErrorCode);
+  return value === "401" || value === "403" || value === "404" || value === "500";
 }

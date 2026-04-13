@@ -4,7 +4,7 @@ import sql from "@/lib/database/client";
 
 export type AdminActionEvent =
   | "application_deleted"
-  | "application_tshirt_shipped_updated"
+  | "application_tshirt_sent_updated"
   | "user_impersonation_started"
   | "user_impersonation_stopped"
   | "user_manual_dashboard_state_updated"

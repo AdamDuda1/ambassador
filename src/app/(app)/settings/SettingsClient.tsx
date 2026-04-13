@@ -71,13 +71,15 @@ export default function SettingsClient({
       if (res.ok) {
         setSaved(true);
       } else {
-        const data = (await res.json().catch(() => null)) as {
-          error?: string;
-        } | null;
+        const data = await res.json().catch(() => null);
+        const payload: Record<string, unknown> | null =
+          typeof data === "object" && data !== null && !Array.isArray(data)
+            ? Object.fromEntries(Object.entries(data))
+            : null;
         setError(
-          data?.error === "invalid_region"
+          payload?.error === "invalid_region"
             ? t("errors.invalid-region")
-            : data?.error === "unauthorized"
+            : payload?.error === "unauthorized"
               ? t("errors.unauthorized")
               : t("errors.generic"),
         );
@@ -166,7 +168,7 @@ export default function SettingsClient({
         <label className="mb-2 block font-body text-base tracking-wide text-white">
           {t("labels.region")}
         </label>
-        <Select value={region} onValueChange={(value) => setRegion(value as AmbassadorRegion)}>
+        <Select value={region} onValueChange={(value) => setRegion(resolveAmbassadorRegion(value))}>
           <SelectTrigger
             className={cn(
               surfaceClass,

@@ -132,8 +132,11 @@ function ShirtOrderBody({
   useAddressRefreshRedirect(needsAddressRefresh);
   useAddressReturnRefresh(addresses.length === 0 && !existingOrder && !requiresOnboarding);
   const [size, setSize] = useState<ShirtSize>(
-    existingOrder?.size && SHIRT_SIZES.includes(existingOrder.size as ShirtSize)
-      ? (existingOrder.size as ShirtSize)
+    existingOrder?.size === "S" ||
+      existingOrder?.size === "M" ||
+      existingOrder?.size === "L" ||
+      existingOrder?.size === "XL"
+      ? existingOrder.size
       : "M",
   );
   const [addressIndex, setAddressIndex] = useState(0);
@@ -161,11 +164,13 @@ function ShirtOrderBody({
       });
 
       if (!res.ok) {
-        const data = (await res.json().catch(() => null)) as {
-          error?: string;
-        } | null;
+        const data = await res.json().catch(() => null);
+        const payload: Record<string, unknown> | null =
+          typeof data === "object" && data !== null && !Array.isArray(data)
+            ? Object.fromEntries(Object.entries(data))
+            : null;
 
-        if (data?.error === "reauth_required") {
+        if (payload?.error === "reauth_required") {
           window.location.assign(refreshAddressesHref);
           return;
         }
@@ -203,9 +208,13 @@ function ShirtOrderBody({
         body: JSON.stringify({ size, addressIndex }),
       });
       if (res.ok) {
-        const data = (await res.json().catch(() => null)) as { id?: string } | null;
+        const data = await res.json().catch(() => null);
+        const payload: Record<string, unknown> | null =
+          typeof data === "object" && data !== null && !Array.isArray(data)
+            ? Object.fromEntries(Object.entries(data))
+            : null;
         setOrder({
-          id: data?.id ?? "",
+          id: typeof payload?.id === "string" ? payload.id : "",
           status: ORDER_STATUS_PENDING,
           size,
           warehouseUrl: null,
@@ -213,23 +222,25 @@ function ShirtOrderBody({
           note: null,
         });
       } else {
-        const data = (await res.json().catch(() => null)) as {
-          error?: string;
-        } | null;
+        const data = await res.json().catch(() => null);
+        const payload: Record<string, unknown> | null =
+          typeof data === "object" && data !== null && !Array.isArray(data)
+            ? Object.fromEntries(Object.entries(data))
+            : null;
         setError(
-          data?.error === "no_address"
+          payload?.error === "no_address"
             ? t("errors.no-address")
-            : data?.error === "not_ambassador"
+            : payload?.error === "not_ambassador"
               ? t("errors.not-ambassador")
-              : data?.error === "onboarding_incomplete"
+              : payload?.error === "onboarding_incomplete"
                 ? t("errors.onboarding-incomplete")
-              : data?.error === "unauthorized"
+                : payload?.error === "unauthorized"
                 ? t("errors.refresh-addresses")
-                : data?.error === "already_ordered"
+                  : payload?.error === "already_ordered"
                   ? t("errors.already-ordered")
-                  : data?.error === "invalid_size"
+                    : payload?.error === "invalid_size"
                     ? t("errors.invalid-size")
-                    : t("errors.generic"),
+                      : t("errors.generic"),
         );
       }
     } catch {

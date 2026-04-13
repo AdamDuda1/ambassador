@@ -5,6 +5,7 @@ const eslintTypeAwareConfig = defineConfig([
   ...baseConfig,
   {
     files: ["**/*.ts", "**/*.tsx", "**/*.mts", "**/*.cts"],
+    ignores: ["src/app/(app)/form/**"],
     languageOptions: {
       parserOptions: {
         projectService: true,

@@ -1,6 +1,3 @@
-const DEFAULT_WAREHOUSE_BASE_URL = "https://mail.hackclub.com"
-const DEFAULT_AMBASSADOR_TAGS = ["Ambassadors"] as const
-
 export type HackClubAuthAddress = {
   first_name?: string
   last_name?: string
@@ -102,7 +99,7 @@ export class WarehouseApiError extends Error {
 function requireWarehouseApiToken() {
   const token = process.env.WAREHOUSE_API?.trim()
 
-  if (!token) {
+  if (token === undefined || token === "") {
     throw new Error("WAREHOUSE_API is not set")
   }
 
@@ -126,7 +123,7 @@ function slugify(value: string) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
 
-  return slug || "recipient"
+  return slug !== "" ? slug : "recipient"
 }
 
 function splitName(name: string) {
@@ -139,12 +136,12 @@ function splitName(name: string) {
 
   return {
     firstName,
-    lastName: rest.join(" ") || undefined,
+    lastName: rest.length > 0 ? rest.join(" ") : undefined,
   }
 }
 
 function requireField(fieldName: string, value?: string) {
-  const normalized = value ? cleanInput(value) : ""
+  const normalized = value !== undefined && value !== "" ? cleanInput(value) : ""
 
   if (!normalized) {
     throw new Error(`Warehouse address is missing ${fieldName}`)
@@ -221,7 +218,7 @@ function unwrapWarehouseOrderResponse(value: unknown): Record<string, unknown> |
 export function parseWarehouseOrderResponse(value: unknown): WarehouseOrderResponse | null {
   const payload = unwrapWarehouseOrderResponse(value)
 
-  if (!payload) {
+  if (payload === null) {
     return null
   }
 
@@ -230,7 +227,14 @@ export function parseWarehouseOrderResponse(value: unknown): WarehouseOrderRespo
   const recipientEmail =
     typeof payload.recipient_email === "string" ? payload.recipient_email : undefined
 
-  if (!id || !status || !recipientEmail) {
+  if (
+    id === undefined ||
+    id === "" ||
+    status === undefined ||
+    status === "" ||
+    recipientEmail === undefined ||
+    recipientEmail === ""
+  ) {
     return null
   }
 
@@ -281,22 +285,31 @@ export function parseWarehouseOrderResponse(value: unknown): WarehouseOrderRespo
 export function pickPrimaryHackClubAddress(addresses: HackClubAuthAddress[]) {
   const normalizedAddresses = addresses
     .map((address) => coerceHackClubAuthAddress(address))
-    .filter((address): address is HackClubAuthAddress => !!address)
+    .filter((address): address is HackClubAuthAddress => address !== null)
 
-  return normalizedAddresses.find((address) => address.primary) ?? normalizedAddresses.at(0) ?? null
+  return normalizedAddresses.find((address) => address.primary === true) ?? normalizedAddresses.at(0) ?? null
 }
 
 export function normalizeHackClubAddress(input: WarehouseAddressInput): WarehouseOrderAddress {
   const splitRecipientName = splitName(input.name)
 
-  const firstName = cleanInput(input.address.first_name || splitRecipientName.firstName)
-  const lastName = cleanInput(input.address.last_name || splitRecipientName.lastName || "")
+  const firstNameSource =
+    typeof input.address.first_name === "string" && input.address.first_name !== ""
+      ? input.address.first_name
+      : splitRecipientName.firstName
+  const lastNameSource =
+    typeof input.address.last_name === "string" && input.address.last_name !== ""
+      ? input.address.last_name
+      : splitRecipientName.lastName ?? ""
+  const firstName = cleanInput(firstNameSource)
+  const lastName = cleanInput(lastNameSource)
+  const line2 = cleanInput(input.address.line_2 ?? "")
 
   return {
     first_name: requireField("first_name", firstName),
-    last_name: lastName || undefined,
+    last_name: lastName !== "" ? lastName : undefined,
     line_1: requireField("line_1", input.address.line_1),
-    line_2: cleanInput(input.address.line_2 || "") || undefined,
+    line_2: line2 !== "" ? line2 : undefined,
     city: requireField("city", input.address.city),
     state: requireField("state", input.address.state),
     postal_code: requireField("postal_code", input.address.postal_code),
@@ -310,7 +323,7 @@ export function buildAmbassadorIdempotencyKey(orderNumber: string, name: string)
 
 export function buildWarehouseOrderPayload(input: SendWarehouseSkuInput): WarehouseCreatePayload {
   const selectedAddress =
-    coerceHackClubAuthAddress(input.address) ?? pickPrimaryHackClubAddress(input.addresses || [])
+    coerceHackClubAuthAddress(input.address) ?? pickPrimaryHackClubAddress(input.addresses ?? [])
 
   if (!selectedAddress) {
     throw new Error("A Hack Club Auth address is required to create a warehouse order")
@@ -325,12 +338,19 @@ export function buildWarehouseOrderPayload(input: SendWarehouseSkuInput): Wareho
   return {
     warehouse_order: {
       recipient_email: cleanInput(input.email),
-      user_facing_title: input.userFacingTitle ? cleanInput(input.userFacingTitle) : undefined,
-      idempotency_key: input.idempotencyKey
+      user_facing_title:
+        input.userFacingTitle !== undefined && input.userFacingTitle !== ""
+          ? cleanInput(input.userFacingTitle)
+          : undefined,
+      idempotency_key:
+        input.idempotencyKey !== undefined && input.idempotencyKey !== ""
         ? cleanInput(input.idempotencyKey)
         : buildAmbassadorIdempotencyKey(input.orderNumber, input.name),
       metadata: input.metadata,
-      tags: input.tags?.length ? input.tags.map((tag) => cleanInput(tag)) : [...DEFAULT_AMBASSADOR_TAGS],
+      tags:
+        Array.isArray(input.tags) && input.tags.length > 0
+          ? input.tags.map((tag) => cleanInput(tag))
+          : ["Ambassadors"],
     },
     address: normalizeHackClubAddress({
       name: input.name,
@@ -350,19 +370,21 @@ export class WarehouseApiClient {
   private readonly token: string
 
   constructor(options: WarehouseApiClientOptions = {}) {
-    this.baseUrl = options.baseUrl?.replace(/\/$/, "") || DEFAULT_WAREHOUSE_BASE_URL
-    this.token = options.token?.trim() || requireWarehouseApiToken()
+    const baseUrl = options.baseUrl?.replace(/\/$/, "")
+    this.baseUrl = baseUrl !== undefined && baseUrl !== "" ? baseUrl : "https://mail.hackclub.com"
+    const token = options.token?.trim()
+    this.token = token !== undefined && token !== "" ? token : requireWarehouseApiToken()
   }
 
   async createOrder(input: SendWarehouseSkuInput) {
-    const response = await this.request<unknown>("/api/v1/warehouse_orders", {
+    const response = await this.request("/api/v1/warehouse_orders", {
       method: "POST",
       body: buildWarehouseOrderPayload(input),
     })
 
     const order = parseWarehouseOrderResponse(response)
 
-    if (!order) {
+    if (order === null) {
       throw new Error("Warehouse API returned an unexpected order payload")
     }
 
@@ -370,7 +392,7 @@ export class WarehouseApiClient {
   }
 
   async getOrder(orderId: string) {
-    const response = await this.request<unknown>(
+    const response = await this.request(
       `/api/v1/warehouse_orders/${encodeURIComponent(orderId)}`,
       {
         method: "GET",
@@ -380,7 +402,7 @@ export class WarehouseApiClient {
 
     const order = parseWarehouseOrderResponse(response)
 
-    if (!order) {
+    if (order === null) {
       throw new Error("Warehouse API returned an unexpected order payload")
     }
 
@@ -420,7 +442,7 @@ export class WarehouseApiClient {
       }
     }
 
-    if (!response.ok) {
+    if (response.ok !== true) {
       throw new WarehouseApiError(`Warehouse API request failed with status ${response.status}`, {
         status: response.status,
         body: responseBody,

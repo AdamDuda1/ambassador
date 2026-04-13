@@ -27,14 +27,14 @@ export async function POST(
 
   const { id } = await params;
   const formData = await request.formData();
-  const [existingUser] = await sql<{ id: string; is_admin: boolean | null }[]>`
+  const existingUser = (await sql<{ id: string; is_admin: boolean | null }[]>`
     SELECT id, is_admin
     FROM users
     WHERE id = ${id}
     LIMIT 1
-  `;
+  `).at(0) ?? null;
 
-  if (!existingUser) {
+  if (existingUser === null) {
     return Response.json({ error: "not_found" }, { status: 404 });
   }
 
@@ -45,7 +45,7 @@ export async function POST(
     WHERE id = ${id}
   `;
 
-  if (!existingUser.is_admin) {
+  if (existingUser.is_admin !== true) {
     await logAdminActionEvent({
       actorUserId: session.sub,
       targetUserId: id,

@@ -32,18 +32,18 @@ export async function POST(
   const trimmedState = typeof rawState === "string" ? rawState.trim() : "";
   const nextState = trimmedState.length === 0 ? null : trimmedState;
 
-  if (nextState && !isUserManualDashboardState(nextState)) {
+  if (nextState !== null && !isUserManualDashboardState(nextState)) {
     return Response.json({ error: "invalid_state" }, { status: 400 });
   }
 
-  const [currentUser] = await sql<{ id: string; manual_dashboard_state: string | null }[]>`
+  const currentUser = (await sql<{ id: string; manual_dashboard_state: string | null }[]>`
     SELECT id, manual_dashboard_state
     FROM users
     WHERE id = ${id}
     LIMIT 1
-  `;
+  `).at(0) ?? null;
 
-  if (!currentUser) {
+  if (currentUser === null) {
     return Response.json({ error: "not_found" }, { status: 404 });
   }
 

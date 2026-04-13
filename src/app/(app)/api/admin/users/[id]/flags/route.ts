@@ -27,14 +27,14 @@ export async function POST(
   const { id } = await params;
   const formData = await request.formData();
   const postersEnabled = formData.has("postersEnabled");
-  const [currentUser] = await sql<{ id: string; posters_enabled: boolean | null }[]>`
+  const currentUser = (await sql<{ id: string; posters_enabled: boolean | null }[]>`
     SELECT id, posters_enabled
     FROM users
     WHERE id = ${id}
     LIMIT 1
-  `;
+  `).at(0) ?? null;
 
-  if (!currentUser) {
+  if (currentUser === null) {
     return Response.json({ error: "not_found" }, { status: 404 });
   }
 

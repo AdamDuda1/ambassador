@@ -16,7 +16,8 @@ type AdminUserRow = {
 
 type ReviewApplicationRow = {
   id: string;
-  user_id: string;
+  user_id: string | null;
+  applicant_email?: string | null;
   status: ApplicationStatus;
   airtable_record_id?: string | null;
   airtable_payload?: unknown | null;
@@ -24,7 +25,7 @@ type ReviewApplicationRow = {
 
 type UpdatedTshirtStatusRow = {
   id: string;
-  tshirt_shipped: boolean | null;
+  tshirt_sent: boolean | null;
 };
 
 export class DuplicateReviewDecisionError extends Error {
@@ -65,7 +66,7 @@ export async function getLatestApplicationForUser(userId: string) {
 
 export async function getLatestApplicationForApplicationId(applicationId: string) {
   const application = (await sql<ReviewApplicationRow[]>`
-    SELECT id, user_id, status
+    SELECT id, user_id, applicant_email, status
     FROM applications
     WHERE id = ${applicationId}
     LIMIT 1
@@ -73,7 +74,26 @@ export async function getLatestApplicationForApplicationId(applicationId: string
 
   if (!application) return null;
 
-  return getLatestApplicationForUser(application.user_id);
+  if (application.user_id !== null) {
+    return getLatestApplicationForUser(application.user_id);
+  }
+
+  const applicantEmail = application.applicant_email?.trim();
+
+  if (applicantEmail === undefined || applicantEmail === "") {
+    return application;
+  }
+
+  const latestByEmail = (await sql<ReviewApplicationRow[]>`
+    SELECT id, user_id, applicant_email, status
+    FROM applications
+    WHERE user_id IS NULL
+      AND LOWER(applicant_email) = LOWER(${applicantEmail})
+    ORDER BY created_at DESC, id DESC
+    LIMIT 1
+  `).at(0);
+
+  return latestByEmail ?? application;
 }
 
 async function syncPermanentRejectionStateForUser(
@@ -103,7 +123,8 @@ async function syncPermanentRejectionStateForUser(
 }
 
 export async function reviewApplication(applicationId: string, input: ReviewDecisionInput) {
-  const note = input.note?.trim() || null;
+  const trimmedNote = input.note?.trim();
+  const note = trimmedNote !== undefined && trimmedNote !== "" ? trimmedNote : null;
 
   const application = (await sql<ReviewApplicationRow[]>`
     SELECT id, user_id, airtable_record_id, status
@@ -141,7 +162,9 @@ export async function reviewApplication(applicationId: string, input: ReviewDeci
       RETURNING id, user_id, status
     `).at(0);
 
-    await syncPermanentRejectionStateForUser(application.user_id, input.status, note);
+    if (application.user_id !== null) {
+      await syncPermanentRejectionStateForUser(application.user_id, input.status, note);
+    }
 
     return updatedApplication;
   });
@@ -158,9 +181,9 @@ export async function reviewLatestApplicationForUser(
   return reviewApplication(latestApplication.id, input);
 }
 
-export async function setApplicationTshirtShipped(
+export async function setApplicationTshirtSent(
   applicationId: string,
-  shipped: boolean,
+  sent: boolean,
 ) {
   const application = (await sql<ReviewApplicationRow[]>`
     SELECT id, airtable_record_id, airtable_payload
@@ -174,31 +197,31 @@ export async function setApplicationTshirtShipped(
   const ambassadorAirtableSync = await syncAmbassadorTshirtSentToAirtable({
     applicationAirtableRecordId: application.airtable_record_id,
     applicationAirtablePayload: application.airtable_payload ?? null,
-    sent: shipped,
+    sent,
   });
 
   const updatedApplication = (await sql<UpdatedTshirtStatusRow[]>`
     UPDATE applications
-    SET tshirt_shipped = ${shipped},
+    SET tshirt_shipped = ${sent},
         airtable_last_synced_at = COALESCE(
           ${ambassadorAirtableSync ? ambassadorAirtableSync.syncedAt.toISOString() : null},
           airtable_last_synced_at
         ),
         updated_at = NOW()
     WHERE id = ${application.id}
-    RETURNING id, tshirt_shipped
+    RETURNING id, tshirt_shipped AS tshirt_sent
   `).at(0);
 
   return updatedApplication ?? null;
 }
 
-export async function setLatestApplicationTshirtShippedForUser(
+export async function setLatestApplicationTshirtSentForUser(
   userId: string,
-  shipped: boolean,
+  sent: boolean,
 ) {
   const latestApplication = await getLatestApplicationForUser(userId);
 
   if (!latestApplication) return null;
 
-  return setApplicationTshirtShipped(latestApplication.id, shipped);
+  return setApplicationTshirtSent(latestApplication.id, sent);
 }

@@ -11,6 +11,8 @@ import { getTranslatedPageMetadata } from "@/i18n/metadata";
 import sql from "@/lib/database/client";
 import { ensureSchema } from "@/lib/database/ensure-schema";
 
+type CountRow = { total: number };
+
 export async function generateMetadata(): Promise<Metadata> {
   return getTranslatedPageMetadata("admin.applications-list.metadata.title");
 }
@@ -40,7 +42,8 @@ export default async function AdminApplicationsPage({
       LEFT JOIN LATERAL (
         SELECT id
         FROM applications
-        WHERE user_id = a.user_id
+        WHERE (a.user_id IS NOT NULL AND user_id = a.user_id)
+           OR (a.user_id IS NULL AND a.applicant_email IS NOT NULL AND user_id IS NULL AND LOWER(applicant_email) = LOWER(a.applicant_email))
         ORDER BY created_at DESC, id DESC
         LIMIT 1
       ) latest ON true
@@ -56,7 +59,7 @@ export default async function AdminApplicationsPage({
       ORDER BY a.created_at DESC
       LIMIT ${20} OFFSET ${offset}
     `,
-    sql`
+    sql<CountRow[]>`
       SELECT COUNT(*)::int AS total
       FROM applications a
       LEFT JOIN users u ON u.id = a.user_id
@@ -72,7 +75,7 @@ export default async function AdminApplicationsPage({
     `,
   ]);
 
-  const totalCount = countResult[0]?.total ?? 0;
+  const totalCount = countResult.at(0)?.total ?? 0;
 
   return (
     <div className="space-y-6">

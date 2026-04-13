@@ -52,3 +52,5 @@ lfs
 # ignore anyway
 AGENTS.md
 CLAUDE.md
+
+lighthouse-reports

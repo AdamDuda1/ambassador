@@ -51,6 +51,10 @@ type OrderDetailRow = {
   reviewed_by_name: string | null;
 };
 
+type OrderIdRow = {
+  id: string;
+};
+
 export default async function AdminOrderDetailPage({
   params,
 }: {
@@ -63,7 +67,7 @@ export default async function AdminOrderDetailPage({
   ]);
   await ensureSchema();
 
-  const [order] = (await sql`
+  const order = (await sql<OrderDetailRow[]>`
     SELECT o.id, o.user_id, o.status, o.sku, o.variant, o.quantity, o.address,
            o.warehouse_order_id, o.warehouse_status, o.warehouse_payload,
            o.note, o.internal_fail_reason,
@@ -76,9 +80,9 @@ export default async function AdminOrderDetailPage({
     LEFT JOIN users reviewer ON reviewer.id = o.reviewed_by
     WHERE o.id = ${id}
     LIMIT 1
-  `) as unknown as OrderDetailRow[];
+  `).at(0) ?? null;
 
-  if (!order) notFound();
+  if (order === null) notFound();
 
   const redirectTo = `/admin/orders/${order.id}`;
   const warehousePayload = parseWarehouseOrderResponse(order.warehouse_payload);
@@ -86,15 +90,13 @@ export default async function AdminOrderDetailPage({
     formatHackClubAddress(order.address) ||
     formatHackClubAddress(warehousePayload?.address) ||
     null;
-  const [latestOrder] = order.user_id
-    ? await sql`
-        SELECT id
-        FROM orders
-        WHERE user_id = ${order.user_id}
-        ORDER BY created_at DESC, id DESC
-        LIMIT 1
-      `
-    : [null];
+  const latestOrder = (await sql<OrderIdRow[]>`
+    SELECT id
+    FROM orders
+    WHERE user_id = ${order.user_id}
+    ORDER BY created_at DESC, id DESC
+    LIMIT 1
+  `).at(0) ?? null;
   const isLatestOrder = latestOrder?.id === order.id;
   const warehouseOrderId = order.warehouse_order_id ?? warehousePayload?.id ?? null;
   const warehouseUrl = warehouseOrderId ? buildWarehouseTrackingUrl(warehouseOrderId) : null;

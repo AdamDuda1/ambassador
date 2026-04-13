@@ -33,17 +33,30 @@ const legacyApplicationStatusMap = {
 export function normalizeApplicationStatus(
   status: string | null | undefined,
 ): ApplicationStatus | null {
-  if (!status) return null;
+  if (status === null || status === undefined || status === "") return null;
 
-  if (status in legacyApplicationStatusMap) {
-    return legacyApplicationStatusMap[
-      status as keyof typeof legacyApplicationStatusMap
-    ];
+  switch (status) {
+    case "pending":
+      return legacyApplicationStatusMap.pending;
+    case "approved":
+      return legacyApplicationStatusMap.approved;
+    case "rejected":
+      return legacyApplicationStatusMap.rejected;
+    case "rejected_permanently":
+      return legacyApplicationStatusMap.rejected_permanently;
+    case "rejected_permenant":
+      return legacyApplicationStatusMap.rejected_permenant;
+    case LEGACY_APPLICATION_STATUS_REJECTED_PERMANENT:
+      return legacyApplicationStatusMap[LEGACY_APPLICATION_STATUS_REJECTED_PERMANENT];
+    case APPLICATION_STATUS_PENDING_AUTOMATIC_CHECKS:
+    case APPLICATION_STATUS_PENDING_REVIEW:
+    case APPLICATION_STATUS_ACCEPTED:
+    case APPLICATION_STATUS_REJECTED:
+    case APPLICATION_STATUS_REJECTED_PERMANENT:
+      return status;
+    default:
+      return null;
   }
-
-  return APPLICATION_STATUS_VALUES.includes(status as ApplicationStatus)
-    ? (status as ApplicationStatus)
-    : null;
 }
 
 export function isPendingApplicationStatus(status: string | null | undefined) {

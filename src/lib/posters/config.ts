@@ -14,6 +14,7 @@ const projectRoot = /* turbopackIgnore: true */ process.cwd();
 export const DEFAULT_POSTER_CAMPAIGN = optionalEnv("POSTER_DEFAULT_CAMPAIGN") ?? "default";
 
 type PosterCampaignConfigFile = {
+  displayName?: string;
   redirectBaseUrl?: string;
   templates?: Partial<Record<PosterStyle, string>>;
   qrCoordinates?: Partial<Record<PosterStyle, Partial<PosterTemplateCoordinates>>>;
@@ -73,7 +74,7 @@ export function readPosterCampaignConfig(campaignSlug: string): PosterCampaignCo
 
   try {
     const raw = fs.readFileSync(configPath, "utf8");
-    return JSON.parse(raw) as PosterCampaignConfigFile;
+    return JSON.parse(raw);
   } catch {
     return {};
   }
@@ -187,8 +188,8 @@ export function listPosterCampaigns(): PosterCampaignSummary[] {
       if (styles.length === 0) continue;
 
       const displayName =
-        typeof (config as { displayName?: string }).displayName === "string"
-          ? ((config as { displayName?: string }).displayName as string)
+        typeof config.displayName === "string"
+          ? config.displayName
           : slug.charAt(0).toUpperCase() + slug.slice(1);
 
       seen.set(slug, { slug, displayName, styles });

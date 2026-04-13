@@ -34,56 +34,68 @@ type MatchedUser = {
   id: string;
 };
 
+type ApplicationIdentityRow = {
+  id: string;
+  user_id: string | null;
+};
+
+type ApplicationStatusRow = {
+  status: string | null;
+  rejection_reason: string | null;
+};
+
+function getTrimmedStringOrNull(value: unknown) {
+  return typeof value === "string" && value.trim() !== "" ? value.trim() : null;
+}
+
 function throwIfAborted(signal?: AbortSignal) {
-  if (!signal?.aborted) return;
+  if (signal?.aborted !== true) return;
 
   throw signal.reason instanceof Error ? signal.reason : new Error("Airtable sync was aborted");
 }
 
 async function findMatchedUser(record: AirtableApplicationRecord): Promise<MatchedUser | null> {
   const slackIdValue = getAirtableApplicationFieldValue(record.fields, "slackId");
-  const slackId = typeof slackIdValue === "string" && slackIdValue.trim() ? slackIdValue.trim() : null;
+  const slackId = getTrimmedStringOrNull(slackIdValue);
 
-  if (slackId) {
-    const [user] = await sql<MatchedUser[]>`
+  if (slackId !== null) {
+    const user = (await sql<MatchedUser[]>`
       SELECT id, hca_id
       FROM users
       WHERE slack_id = ${slackId}
       ORDER BY updated_at DESC, created_at DESC
       LIMIT 1
-    `;
+    `).at(0) ?? null;
 
-    if (user) return user;
+    if (user !== null) return user;
   }
 
   const emailValue = getAirtableApplicationFieldValue(record.fields, "email");
-  const email = typeof emailValue === "string" && emailValue.trim() ? emailValue.trim() : null;
+  const email = getTrimmedStringOrNull(emailValue);
 
-  if (!email) return null;
+  if (email === null) return null;
 
-  const [user] = await sql<MatchedUser[]>`
+  const user = (await sql<MatchedUser[]>`
     SELECT id, hca_id
     FROM users
     WHERE LOWER(email) = LOWER(${email})
     ORDER BY updated_at DESC, created_at DESC
     LIMIT 1
-  `;
+  `).at(0) ?? null;
 
-  return user ?? null;
+  return user;
 }
 
 async function syncPermanentRejectionStateForUser(userId: string) {
-  const [latestApplication] = await sql<
-    Array<{ rejection_reason: string | null; status: string | null }>
-  >`
+  const latestApplication = (await sql<ApplicationStatusRow[]>`
     SELECT status, rejection_reason
     FROM applications
     WHERE user_id = ${userId}
     ORDER BY created_at DESC, id DESC
     LIMIT 1
-  `;
+  `).at(0) ?? null;
 
-  if (!latestApplication) return;
+  if (latestApplication === null) return;
 
   if (isRejectedPermanentlyApplicationStatus(latestApplication.status)) {
     await sql`
@@ -107,13 +119,13 @@ async function syncPermanentRejectionStateForUser(userId: string) {
 }
 
 export async function linkApplicationsToUser(input: LinkApplicationsToUserInput) {
-  const slackId = input.slackId?.trim() || null;
-  const email = input.email?.trim() || null;
-  const hcaId = input.hcaId?.trim() || null;
+  const slackId = getTrimmedStringOrNull(input.slackId);
+  const email = getTrimmedStringOrNull(input.email);
+  const hcaId = getTrimmedStringOrNull(input.hcaId);
   const hasSlackId = slackId !== null;
   const hasEmail = email !== null;
 
-  if (!slackId && !email && !hcaId) return 0;
+  if (slackId === null && email === null && hcaId === null) return 0;
 
   const matchedApplications = await sql<Array<{ id: string }>>`
     UPDATE applications
@@ -169,88 +181,76 @@ export async function syncAirtableApplicationsToPostgres(
     const matchedUser = await findMatchedUser(record);
     throwIfAborted(options.signal);
 
-    const [existingApplication] = await sql<
-      Array<{ id: string; user_id: string | null }>
-    >`
+    const existingApplication = (await sql<ApplicationIdentityRow[]>`
       SELECT id, user_id
       FROM applications
       WHERE airtable_record_id = ${record.id}
       LIMIT 1
-    `;
+    `).at(0) ?? null;
     throwIfAborted(options.signal);
 
-    const fieldValues = Object.fromEntries(
-      ([
-        "status",
-        "preferredName",
-        "firstName",
-        "lastName",
-        "rejectionReason",
-        "email",
-        "slackId",
-        "phone",
-        "birthdate",
-        "addressLine1",
-        "addressLine2",
-        "addressCity",
-        "addressState",
-        "addressZip",
-        "addressCountry",
-        "githubUrl",
-        "portfolioUrl",
-        "applicationFirstThingDo",
-        "applicationBestPlacePoster",
-        "idvStatus",
-      ] as const).map((key) => {
-        const value = getAirtableApplicationFieldValue(record.fields, key);
-
-        return [key, typeof value === "string" && value.trim() ? value.trim() : null];
-      }),
-    ) as Record<
-      | "status"
-      | "preferredName"
-      | "firstName"
-      | "lastName"
-      | "rejectionReason"
-      | "email"
-      | "slackId"
-      | "phone"
-      | "birthdate"
-      | "addressLine1"
-      | "addressLine2"
-      | "addressCity"
-      | "addressState"
-      | "addressZip"
-      | "addressCountry"
-      | "githubUrl"
-      | "portfolioUrl"
-      | "applicationFirstThingDo"
-      | "applicationBestPlacePoster"
-      | "idvStatus",
-      string | null
-    >;
+    const rawStatus = getAirtableApplicationFieldValue(record.fields, "status");
+    const rawPreferredName = getAirtableApplicationFieldValue(record.fields, "preferredName");
+    const rawFirstName = getAirtableApplicationFieldValue(record.fields, "firstName");
+    const rawLastName = getAirtableApplicationFieldValue(record.fields, "lastName");
+    const rawRejectionReason = getAirtableApplicationFieldValue(record.fields, "rejectionReason");
+    const rawEmail = getAirtableApplicationFieldValue(record.fields, "email");
+    const rawSlackId = getAirtableApplicationFieldValue(record.fields, "slackId");
+    const rawPhone = getAirtableApplicationFieldValue(record.fields, "phone");
+    const rawBirthdate = getAirtableApplicationFieldValue(record.fields, "birthdate");
+    const rawAddressLine1 = getAirtableApplicationFieldValue(record.fields, "addressLine1");
+    const rawAddressLine2 = getAirtableApplicationFieldValue(record.fields, "addressLine2");
+    const rawAddressCity = getAirtableApplicationFieldValue(record.fields, "addressCity");
+    const rawAddressState = getAirtableApplicationFieldValue(record.fields, "addressState");
+    const rawAddressZip = getAirtableApplicationFieldValue(record.fields, "addressZip");
+    const rawAddressCountry = getAirtableApplicationFieldValue(record.fields, "addressCountry");
+    const rawGithubUrl = getAirtableApplicationFieldValue(record.fields, "githubUrl");
+    const rawPortfolioUrl = getAirtableApplicationFieldValue(record.fields, "portfolioUrl");
+    const rawApplicationFirstThingDo = getAirtableApplicationFieldValue(record.fields, "applicationFirstThingDo");
+    const rawApplicationBestPlacePoster = getAirtableApplicationFieldValue(record.fields, "applicationBestPlacePoster");
+    const rawIdvStatus = getAirtableApplicationFieldValue(record.fields, "idvStatus");
+    const fieldValues = {
+      status: getTrimmedStringOrNull(rawStatus),
+      preferredName: getTrimmedStringOrNull(rawPreferredName),
+      firstName: getTrimmedStringOrNull(rawFirstName),
+      lastName: getTrimmedStringOrNull(rawLastName),
+      rejectionReason: getTrimmedStringOrNull(rawRejectionReason),
+      email: getTrimmedStringOrNull(rawEmail),
+      slackId: getTrimmedStringOrNull(rawSlackId),
+      phone: getTrimmedStringOrNull(rawPhone),
+      birthdate: getTrimmedStringOrNull(rawBirthdate),
+      addressLine1: getTrimmedStringOrNull(rawAddressLine1),
+      addressLine2: getTrimmedStringOrNull(rawAddressLine2),
+      addressCity: getTrimmedStringOrNull(rawAddressCity),
+      addressState: getTrimmedStringOrNull(rawAddressState),
+      addressZip: getTrimmedStringOrNull(rawAddressZip),
+      addressCountry: getTrimmedStringOrNull(rawAddressCountry),
+      githubUrl: getTrimmedStringOrNull(rawGithubUrl),
+      portfolioUrl: getTrimmedStringOrNull(rawPortfolioUrl),
+      applicationFirstThingDo: getTrimmedStringOrNull(rawApplicationFirstThingDo),
+      applicationBestPlacePoster: getTrimmedStringOrNull(rawApplicationBestPlacePoster),
+      idvStatus: getTrimmedStringOrNull(rawIdvStatus),
+    };
     const status =
       normalizeApplicationStatus(fieldValues.status) ||
       APPLICATION_STATUS_PENDING_REVIEW;
-    const applicationName =
-      [fieldValues.preferredName ?? fieldValues.firstName, fieldValues.lastName]
-        .filter((value): value is string => Boolean(value))
-        .join(" ") ||
-      null;
+    const applicationNameParts = [fieldValues.preferredName ?? fieldValues.firstName, fieldValues.lastName]
+      .filter((value): value is string => value !== null && value !== "");
+    const applicationName = applicationNameParts.length > 0 ? applicationNameParts.join(" ") : null;
     const rejectionReason = fieldValues.rejectionReason;
     const userId = matchedUser?.id ?? existingApplication?.user_id ?? null;
     const payload = record.fields;
     const createdAt = new Date(record.createdTime).toISOString();
     const syncedAt = new Date().toISOString();
 
-    if (userId) {
+    if (userId !== null) {
       touchedUserIds.add(userId);
       matchedUserIds.add(userId);
     } else {
       result.unmatchedApplications += 1;
     }
 
-    if (existingApplication) {
+    if (existingApplication !== null) {
       await sql`
         UPDATE applications
         SET user_id = ${userId},
