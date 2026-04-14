@@ -1,25 +1,54 @@
-export function formatDate(value: string | null | undefined, locale: string) {
-  const trimmedValue = value?.trim() ?? "";
+function normalizeDateValue(value: string | number | Date | null | undefined) {
+  if (typeof value === "string") {
+    const trimmedValue = value.trim();
+    return trimmedValue === "" ? null : trimmedValue;
+  }
 
-  if (trimmedValue === "") {
+  if (typeof value === "number" || value instanceof Date) {
+    return value;
+  }
+
+  return null;
+}
+
+function isValidDate(date: Date) {
+  return !Number.isNaN(date.getTime());
+}
+
+export function formatDate(value: string | number | Date | null | undefined, locale: string) {
+  const normalizedValue = normalizeDateValue(value);
+
+  if (normalizedValue === null) {
     return null;
   }
 
-  return new Date(trimmedValue).toLocaleDateString(locale, {
+  const date = new Date(normalizedValue);
+
+  if (!isValidDate(date)) {
+    return null;
+  }
+
+  return date.toLocaleDateString(locale, {
     month: "long",
     day: "numeric",
     year: "numeric",
   });
 }
 
-export function formatDateTime(value: string | null | undefined, locale: string) {
-  const trimmedValue = value?.trim() ?? "";
+export function formatDateTime(value: string | number | Date | null | undefined, locale: string) {
+  const normalizedValue = normalizeDateValue(value);
 
-  if (trimmedValue === "") {
+  if (normalizedValue === null) {
     return null;
   }
 
-  return new Date(trimmedValue).toLocaleString(locale, {
+  const date = new Date(normalizedValue);
+
+  if (!isValidDate(date)) {
+    return null;
+  }
+
+  return date.toLocaleString(locale, {
     month: "short",
     day: "numeric",
     year: "numeric",
