@@ -3,8 +3,8 @@ import Image from "next/image";
 import ambassador from "@/assets/landing/logo/ambassador.png";
 import become from "@/assets/landing/logo/become.png";
 import becomeArrow from "@/assets/landing/logo/become-arrow.png";
-import summer26Bg from "@/assets/landing/logo/summer-26-bg.png";
-import summer26Fg from "@/assets/landing/logo/summer-26-fg.png";
+import stardanceBg from "@/assets/landing/logo/stardance-bg.png";
+import stardanceFg from "@/assets/landing/logo/stardance-fg.png";
 import highlight from "@/assets/landing/highlight.svg";
 import flagHoldingText from "@/assets/landing/flagholdingtext.png";
 
@@ -42,7 +42,7 @@ export default function Hero() {
             />
             <div className="absolute -bottom-5 rotate-2 -right-2">
               <Image
-                src={summer26Bg}
+                src={stardanceBg}
                 alt=""
                 role="presentation"
                 className="h-8 w-auto"
@@ -50,11 +50,11 @@ export default function Hero() {
                 sizes="8rem"
               />
               <Image
-                src={summer26Fg}
+                src={stardanceFg}
                 alt="Summer '26"
                 className="h-4 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-auto"
                 placeholder="blur"
-                sizes="4rem"
+                sizes="6rem"
               />
             </div>
           </div>
