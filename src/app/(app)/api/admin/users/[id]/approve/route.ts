@@ -1,10 +1,13 @@
+import { revalidatePath } from "next/cache";
+
 import {
   DuplicateReviewDecisionError,
   getLatestApplicationForUser,
   isUserAdmin,
   reviewLatestApplicationForUser,
 } from "@/lib/applications/review";
-import { getSafeRedirectUrl, isSameOriginRequest } from "@/lib/http";
+import { requestOfficeGrantProvisioningForUser } from "@/lib/hcb/grants";
+import { getSafeRedirectPath, isSameOriginRequest } from "@/lib/http";
 import { APPLICATION_STATUS_ACCEPTED } from "@/lib/applications/status";
 import { ensureSchema } from "@/lib/database/ensure-schema";
 import { getActorSession } from "@/lib/session";
@@ -29,6 +32,7 @@ export async function POST(
 
   const { id } = await params;
   const formData = await request.formData();
+  const shouldProvisionGrant = formData.get("provisionGrant") === "true";
   const target = await getLatestApplicationForUser(id);
 
   if (!target) {
@@ -48,5 +52,34 @@ export async function POST(
     throw error;
   }
 
-  return Response.redirect(getSafeRedirectUrl(request, formData.get("redirectTo"), `/admin/users/${id}`));
+  let grantStatus: string | null = null;
+
+  if (shouldProvisionGrant) {
+    try {
+      grantStatus = await requestOfficeGrantProvisioningForUser({
+        userId: id,
+        actorUserId: session.sub,
+      });
+    } catch (error) {
+      console.error("Failed to request office grant provisioning during override approval", {
+        userId: id,
+        error,
+      });
+      grantStatus = "provision_failed";
+    }
+  }
+
+  revalidatePath(`/admin/users/${id}`);
+  revalidatePath("/dashboard");
+
+  const redirectUrl = new URL(
+    getSafeRedirectPath(formData.get("redirectTo"), `/admin/users/${id}`),
+    request.url,
+  );
+
+  if (grantStatus !== null) {
+    redirectUrl.searchParams.set("hcbGrant", grantStatus);
+  }
+
+  return Response.redirect(redirectUrl);
 }

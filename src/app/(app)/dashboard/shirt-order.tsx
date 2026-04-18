@@ -263,7 +263,7 @@ function ShirtOrderBody({
 
   if (requiresOnboarding) {
     return (
-      <p className="mt-5 font-body text-base text-white">
+      <p className="mt-2 font-body text-base text-white">
         {t.rich("onboarding.body", {
           link: (chunks) => (
             <a

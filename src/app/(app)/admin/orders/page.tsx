@@ -2,14 +2,18 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { getLocale, getTranslations } from "next-intl/server";
 
+import { ConfirmSubmitForm } from "@/components/admin/confirm-submit-form";
 import { Pagination } from "@/components/admin/pagination";
 import { SearchBar } from "@/components/admin/search-bar";
+import { StatusFilter } from "@/components/admin/status-filter";
 import { SlackAvatar } from "@/components/admin/slack-profile";
 import { WarehouseStats } from "@/components/admin/warehouse-stats";
+import { buttonVariants } from "@/components/ui/button";
 import { pillVariants } from "@/components/ui/pill";
 import { getTranslatedPageMetadata } from "@/i18n/metadata";
 import sql from "@/lib/database/client";
 import { ensureSchema } from "@/lib/database/ensure-schema";
+import { getHcbOauthConnection } from "@/lib/hcb/service";
 import {
   ORDER_STATUS_APPROVED,
   ORDER_STATUS_CANCELLED,
@@ -37,6 +41,23 @@ type CountRow = {
   total: number;
 };
 
+const ORDER_STATUS_FILTER_OPTIONS = [
+  { value: ORDER_STATUS_PENDING, labelKey: "admin.orders.status-filter.pending" },
+  { value: ORDER_STATUS_APPROVED, labelKey: "admin.orders.status-filter.approved" },
+  { value: ORDER_STATUS_REJECTED, labelKey: "admin.orders.status-filter.rejected" },
+  { value: ORDER_STATUS_FAILED, labelKey: "admin.orders.status-filter.failed" },
+  { value: ORDER_STATUS_CANCELLED, labelKey: "admin.orders.status-filter.cancelled" },
+] as const;
+
+const HCB_AUTH_STATUS_MESSAGES = new Map<string, string>([
+  ["connected", "HCB authorization updated."],
+  ["denied", "HCB authorization was cancelled."],
+  ["invalid_state", "HCB authorization failed because the state did not match."],
+  ["missing_code", "HCB authorization failed because no code was returned."],
+  ["forbidden", "HCB authorization requires an active admin session."],
+  ["failed", "HCB authorization failed."],
+]);
+
 export async function generateMetadata(): Promise<Metadata> {
   return getTranslatedPageMetadata("admin.orders.metadata.title");
 }
@@ -44,7 +65,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function AdminOrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; q?: string }>;
+  searchParams: Promise<{ page?: string; q?: string; hcb?: string; status?: string }>;
 }) {
   const [t, locale, query] = await Promise.all([getTranslations(), getLocale(), searchParams]);
   await ensureSchema();
@@ -53,8 +74,10 @@ export default async function AdminOrdersPage({
   const offset = (page - 1) * 20;
   const search = query.q?.trim() ?? "";
   const searchFilter = search ? `%${search}%` : null;
+  const statusFilter = query.status?.trim() ?? "";
+  const filterByStatus = statusFilter !== "" ? statusFilter : null;
 
-  const [orders, countResult] = await Promise.all([
+  const [orders, countResult, hcbConnection] = await Promise.all([
     sql<OrderRow[]>`
       SELECT o.id, o.status, o.sku, o.variant, o.address, o.note, o.created_at,
              u.display_name AS user_name, u.email AS user_email,
@@ -67,6 +90,9 @@ export default async function AdminOrdersPage({
         OR u.slack_id ILIKE ${searchFilter}
         OR u.slack_name ILIKE ${searchFilter}
       ))
+      AND (
+        ${filterByStatus}::text IS NULL OR o.status = ${filterByStatus}
+      )
       ORDER BY
         CASE WHEN o.status = ${ORDER_STATUS_PENDING} THEN 0 ELSE 1 END,
         o.created_at DESC
@@ -82,18 +108,67 @@ export default async function AdminOrdersPage({
         OR u.slack_id ILIKE ${searchFilter}
         OR u.slack_name ILIKE ${searchFilter}
       ))
+      AND (
+        ${filterByStatus}::text IS NULL OR o.status = ${filterByStatus}
+      )
     `,
+    getHcbOauthConnection(),
   ]);
 
   const totalCount = countResult.at(0)?.total ?? 0;
+  const hcbStatus = query.hcb?.trim() ?? "";
+  const hcbStatusMessage = hcbStatus === "" ? null : HCB_AUTH_STATUS_MESSAGES.get(hcbStatus) ?? null;
+  const authorizedAccount = [
+    hcbConnection?.authorizedHcbUserName ?? null,
+    hcbConnection?.authorizedHcbUserEmail ?? null,
+  ].filter((value): value is string => value !== null && value.trim() !== "");
 
   return (
     <div className="space-y-6">
       <header className="space-y-4">
-        <h1 className="text-4xl text-white">{t("admin.orders.title")}</h1>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <h1 className="text-4xl text-white">{t("admin.orders.title")}</h1>
+          <ConfirmSubmitForm
+            action="/api/admin/hcb/authorize"
+            method="POST"
+            confirmationMessage="Re-authorize the HCB integration?"
+          >
+            <button className={buttonVariants({ size: "app-sm" })}>
+              Re-authorize HCB
+            </button>
+          </ConfirmSubmitForm>
+        </div>
+        <div className="space-y-1">
+          <p className="font-body text-sm text-white">
+            {authorizedAccount.length > 0
+              ? `Authorized HCB account: ${authorizedAccount.join(" · ")}`
+              : "No HCB account is currently authorized."}
+          </p>
+          {hcbConnection?.lastError !== null &&
+          hcbConnection?.lastError !== undefined &&
+          hcbConnection.lastError.trim() !== "" ? (
+            <p className="font-body text-sm text-white">{`Last HCB error: ${hcbConnection.lastError}`}</p>
+          ) : null}
+          {hcbStatusMessage !== null ? (
+            <p className="font-body text-sm text-white">{hcbStatusMessage}</p>
+          ) : null}
+        </div>
         <WarehouseStats locale={locale} />
       </header>
-      <SearchBar placeholder={t("admin.search-placeholder")} />
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="w-full max-w-sm">
+          <SearchBar placeholder={t("admin.search-placeholder")} />
+        </div>
+        <div className="w-full sm:ml-auto sm:w-auto">
+          <StatusFilter
+            placeholder={t("admin.orders.status-filter.all")}
+            options={ORDER_STATUS_FILTER_OPTIONS.map((option) => ({
+              value: option.value,
+              label: t(option.labelKey),
+            }))}
+          />
+        </div>
+      </div>
       <div className="overflow-x-auto border border-white/10 bg-card p-3 md:p-4">
         <table className="w-full text-left">
           <thead>

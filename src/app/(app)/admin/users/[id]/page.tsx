@@ -3,9 +3,11 @@ import type { Metadata } from "next";
 import { getLocale, getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
 
+import { ApproveWithGrantForm } from "@/components/admin/approve-with-grant-form";
 import { ConfirmSubmitForm } from "@/components/admin/confirm-submit-form";
 import { DetailFieldRow, DetailPager, DetailSection } from "@/components/admin/detail";
 import { SlackAvatar, SlackProfile } from "@/components/admin/slack-profile";
+import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { buttonVariants } from "@/components/ui/button";
 import { pillVariants } from "@/components/ui/pill";
@@ -22,6 +24,11 @@ import {
 import sql from "@/lib/database/client";
 import { ensureSchema } from "@/lib/database/ensure-schema";
 import { formatDate, formatDateTime, joinNonEmpty } from "@/lib/format";
+import {
+  getOfficeGrantDashboardMessage,
+  refreshOfficeGrantBalanceForUser,
+} from "@/lib/hcb/grants";
+import { OFFICE_GRANT_AMOUNT_CENTS, OFFICE_GRANT_PURPOSE } from "@/lib/hcb/constants";
 import { readHcaAccessToken } from "@/lib/hca-access-token";
 import { ensureUserAddressSchema } from "@/lib/database/user-address-schema";
 import {
@@ -75,6 +82,20 @@ type ApplicationListRow = {
 type CountRow = { count: number };
 type LatestNoteEventRow = { note: string | null };
 
+const HCB_GRANT_STATUS_MESSAGES = new Map<string, string>([
+  ["linked", "HCB office grant linked."],
+  ["queued", "HCB office grant queued for provisioning."],
+  ["already_linked", "This user already has an HCB office grant linked."],
+  ["already_pending", "This user's HCB office grant is already pending provisioning."],
+  ["not_onboarded", "This user is not onboarded yet, so no HCB office grant was queued."],
+  ["provision_failed", "The HCB office grant request failed."],
+  ["unlinked", "HCB office grant unlinked."],
+  ["invalid", "Enter a grant ID before linking."],
+  ["not_found", "User not found."],
+  ["link_failed", "Could not link that HCB grant."],
+  ["unlink_failed", "Could not unlink that HCB grant."],
+]);
+
 export async function generateMetadata(): Promise<Metadata> {
   return getTranslatedPageMetadata("admin.user-detail.metadata.title");
 }
@@ -84,7 +105,7 @@ export default async function AdminUserDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ visitsPage?: string; notesPage?: string }>;
+  searchParams: Promise<{ visitsPage?: string; notesPage?: string; hcbGrant?: string }>;
 }) {
   const [{ id }, query, t, locale, actorSession] = await Promise.all([
     params,
@@ -209,6 +230,22 @@ export default async function AdminUserDetailPage({
     typeof latestNoteEvent?.note === "string" && latestNoteEvent.note.trim().length > 0
       ? latestNoteEvent.note
       : null;
+  const officeGrant = await refreshOfficeGrantBalanceForUser(user.id);
+  const usdFormatter = new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency: "USD",
+  });
+  const officeGrantDashboardMessage = getOfficeGrantDashboardMessage({ grant: officeGrant });
+  const officeGrantUrl = officeGrantDashboardMessage.href;
+  const officeGrantBalance =
+    officeGrant?.balanceCents !== null &&
+    officeGrant?.balanceCents !== undefined &&
+    Number.isFinite(officeGrant.balanceCents)
+      ? usdFormatter.format(officeGrant.balanceCents / 100)
+      : null;
+  const hcbGrantStatus = query.hcbGrant?.trim() ?? "";
+  const hcbGrantFlashMessage =
+    hcbGrantStatus === "" ? null : HCB_GRANT_STATUS_MESSAGES.get(hcbGrantStatus) ?? null;
 
   const totalVisitPages = Math.max(1, Math.ceil(visitCountResult / 3));
   const currentVisitPage = Math.min(visitsPage, totalVisitPages);
@@ -350,12 +387,16 @@ export default async function AdminUserDetailPage({
               </div>
 
               {canAccept ? (
-                <form action={`/api/admin/users/${user.id}/approve`} method="POST" className="max-w-xl space-y-3">
+                <ApproveWithGrantForm
+                  action={`/api/admin/users/${user.id}/approve`}
+                  method="POST"
+                  className="max-w-xl space-y-3"
+                >
                   <input type="hidden" name="redirectTo" value={`/admin/users/${user.id}`} />
                   <button className={buttonVariants({ variant: "success", size: "app" })}>
                     {t("admin.user-detail.actions.bypass-approval")}
                   </button>
-                </form>
+                </ApproveWithGrantForm>
               ) : null}
 
               {canReject ? (
@@ -477,6 +518,126 @@ export default async function AdminUserDetailPage({
           </button>
         </form>
       </DetailSection>
+
+      <div id="office-grant">
+        <DetailSection
+          title="Office Grant"
+          description="Manage the linked HCB office-expenses grant for this ambassador."
+        >
+          {hcbGrantFlashMessage !== null ? (
+            <p className="font-body text-base text-white">{hcbGrantFlashMessage}</p>
+          ) : null}
+          <DetailFieldRow
+            label="Provisioning state"
+            value={officeGrant?.provisioningState ?? "none"}
+          />
+          <DetailFieldRow
+            label="Provisioning source"
+            value={officeGrant?.provisioningSource}
+          />
+          <DetailFieldRow
+            label="Grant ID"
+            value={officeGrant?.grantId}
+            mono
+          />
+          <DetailFieldRow
+            label="Purpose"
+            value={officeGrant?.purpose ?? OFFICE_GRANT_PURPOSE}
+          />
+          <DetailFieldRow
+            label="Amount"
+            value={usdFormatter.format((officeGrant?.amountCents ?? OFFICE_GRANT_AMOUNT_CENTS) / 100)}
+          />
+          <div className="grid gap-2 sm:grid-cols-[14rem_minmax(0,1fr)] sm:gap-5">
+            <div className="text-sm text-secondary">Current balance</div>
+            <div className="font-body text-base text-acceptance break-words [overflow-wrap:anywhere]">
+              {officeGrantBalance ?? "-"}
+            </div>
+          </div>
+          <DetailFieldRow
+            label="Grant link"
+            value={officeGrantUrl}
+            mono
+          />
+          <DetailFieldRow
+            label="User-facing status"
+            value={officeGrantDashboardMessage.body}
+          />
+          <DetailFieldRow
+            label="Last error"
+            value={officeGrant?.lastError}
+          />
+          <DetailFieldRow
+            label="Next retry"
+            value={formatDateTime(officeGrant?.nextRetryAt, locale)}
+          />
+          <DetailFieldRow
+            label="Balance synced"
+            value={formatDateTime(officeGrant?.balanceSyncedAt, locale)}
+          />
+          <DetailFieldRow
+            label="Linked at"
+            value={formatDateTime(officeGrant?.linkedAt, locale)}
+          />
+
+          <div className="flex flex-wrap items-end gap-4">
+            {officeGrantUrl !== null ? (
+              <a
+                href={officeGrantUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="ui-open-link inline-flex font-body text-lg leading-none"
+                aria-label="Open office grant"
+              >
+                <span aria-hidden="true">↗</span>
+              </a>
+            ) : null}
+
+            <ConfirmSubmitForm
+              action={`/api/admin/users/${user.id}/hcb-grant/provision`}
+              method="POST"
+              confirmationMessage="Are you sure?"
+            >
+              <input type="hidden" name="redirectTo" value={`/admin/users/${user.id}#office-grant`} />
+              <button className={buttonVariants({ variant: "success", size: "app" })}>
+                Provision grant
+              </button>
+            </ConfirmSubmitForm>
+
+            <ConfirmSubmitForm
+              action={`/api/admin/users/${user.id}/hcb-grant/unlink`}
+              method="POST"
+              confirmationMessage="Are you sure?"
+            >
+              <input type="hidden" name="redirectTo" value={`/admin/users/${user.id}#office-grant`} />
+              <button className={buttonVariants({ size: "app" })}>
+                Unlink grant
+              </button>
+            </ConfirmSubmitForm>
+          </div>
+
+          <ConfirmSubmitForm
+            action={`/api/admin/users/${user.id}/hcb-grant/link`}
+            method="POST"
+            className="max-w-sm space-y-3"
+            confirmationMessage="Are you sure?"
+          >
+            <input type="hidden" name="redirectTo" value={`/admin/users/${user.id}#office-grant`} />
+            <label className="block text-sm text-secondary">
+              Link to grant ID
+              <Input
+                name="grantId"
+                type="text"
+                placeholder="grt_..."
+                className="ui-input-surface !bg-muted mt-2 h-11 !rounded-none [border-radius:0!important] border-0 px-4 font-body text-base text-foreground placeholder:text-foreground/40 hover:!bg-muted md:text-base"
+              />
+            </label>
+            <button className={buttonVariants({ variant: "success", size: "app" })}>
+              Link grant
+            </button>
+          </ConfirmSubmitForm>
+        </DetailSection>
+      </div>
 
       <div id="internal-notes">
         <DetailSection

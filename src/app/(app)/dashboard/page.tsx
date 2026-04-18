@@ -19,6 +19,11 @@ import {
 import sql from "@/lib/database/client";
 import { canShowDevAdminSelector, isDevState, type DevState } from "@/lib/dev-admin-selector";
 import { ensureSchema } from "@/lib/database/ensure-schema";
+import {
+  getOfficeGrantDashboardMessage,
+  refreshOfficeGrantBalanceForUser,
+  type OfficeGrantRecord,
+} from "@/lib/hcb/grants";
 import { loadUserHackClubAddresses } from "@/lib/hca-addresses";
 import { readHcaAccessToken } from "@/lib/hca-access-token";
 import { canAccessPosters } from "@/lib/posters/access";
@@ -180,6 +185,7 @@ export default async function DashboardPage({
 
   const canAccessAdmin = Boolean(session.impersonator) || Boolean(user.is_admin ?? session.isAdmin);
   const canUseSelector = canShowDevAdminSelector(canAccessAdmin);
+  const officeGrant = await refreshOfficeGrantBalanceForUser(session.sub);
   const stateInput = {
     application,
     user,
@@ -187,6 +193,7 @@ export default async function DashboardPage({
     fakeDate: new Date().toISOString(),
     t,
     shirt,
+    officeGrant,
     canUseShirts,
   };
   const baseResolved = resolveState({ ...stateInput, activeDevState: null });
@@ -241,6 +248,7 @@ function resolveState({
   t,
   shirt,
   canUseShirts,
+  officeGrant,
 }: {
   activeDevState: DevState | null;
   application: { status: string; created_at: string } | null;
@@ -257,6 +265,7 @@ function resolveState({
   fakeDate: string;
   t: DashboardTranslations;
   shirt: ShirtOrderSectionProps;
+  officeGrant: OfficeGrantRecord | null;
   canUseShirts: boolean;
 }): ResolvedState {
   const states = {
@@ -321,6 +330,7 @@ function resolveState({
             title={t("dashboard.approved.title")}
             body={t("dashboard.approved.body")}
           />
+          <OfficeGrantSection officeGrant={officeGrant} />
           {canUseShirts ? <ShirtOrderSection {...shirt} /> : null}
         </div>
       ),
@@ -413,6 +423,36 @@ function resolveState({
   if (isRejectedApplicationStatus(application.status)) return states.rejected;
   if (isRejectedPermanentlyApplicationStatus(application.status)) return states.banned;
   return { node: null, activeStep: null, decision: null, devState: "apply" };
+}
+
+function OfficeGrantSection({
+  officeGrant,
+}: {
+  officeGrant: OfficeGrantRecord | null;
+}) {
+  const message = getOfficeGrantDashboardMessage({ grant: officeGrant });
+
+  return (
+    <section>
+      <div className="min-w-0">
+        <h2 className="font-sub text-2xl text-white md:text-3xl">Office grant</h2>
+
+        <p className="mt-2 text-base leading-relaxed text-muted-foreground md:text-lg">
+          {message.state === "linked" && message.href !== null ? (
+            <>
+              Find your office grant{" "}
+              <a href={message.href} target="_blank" rel="noreferrer" className="underline-offset-4 hover:underline">
+                here
+              </a>
+              ! Please be careful with spending your funds and feel free to ask if a purchase is an acceptable office expense.
+            </>
+          ) : (
+            message.body
+          )}
+        </p>
+      </div>
+    </section>
+  );
 }
 
 function JourneyStepper({

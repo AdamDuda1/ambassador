@@ -15,7 +15,7 @@ import sql from "@/lib/database/client";
 import { ensureSchema } from "@/lib/database/ensure-schema";
 import { fetchGeo, geocodeIp, linkAnonymousVisits } from "@/lib/geo";
 import { encryptHcaAccessToken } from "@/lib/hca-access-token";
-import { getRequestIp, getSafeRedirectPath } from "@/lib/http";
+import { getAppUrl, getRequestIp, getSafeRedirectPath } from "@/lib/http";
 import { createToken, setSession } from "@/lib/session";
 import {
   normalizeHackClubAddresses,
@@ -46,12 +46,12 @@ export async function GET(request: Request) {
     state !== expectedState
   ) {
     cookieStore.delete(AUTH_INTENT_COOKIE_NAME);
-    return Response.redirect(`${process.env.CURRENT_DOMAIN}/?error=invalid_state`);
+    return Response.redirect(getAppUrl("/?error=invalid_state", request));
   }
 
   if (code === null || code === "") {
     cookieStore.delete(AUTH_INTENT_COOKIE_NAME);
-    return Response.redirect(`${process.env.CURRENT_DOMAIN}/?error=no_code`);
+    return Response.redirect(getAppUrl("/?error=no_code", request));
   }
 
   const tokenData = await exchangeCodeForToken(code);
@@ -258,5 +258,5 @@ export async function GET(request: Request) {
 
   await setSession(token);
 
-  return Response.redirect(`${process.env.CURRENT_DOMAIN}${nextPath}`);
+  return Response.redirect(getAppUrl(nextPath, request));
 }

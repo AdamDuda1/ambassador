@@ -293,6 +293,14 @@ status:
 
 admin:
   search-placeholder: Search by name, email or Slack ID...
+  status-filter:
+    all: All statuses
+    none: No application
+    pending-automatic-checks: Pending Automatic Checks
+    pending-review: Pending Review
+    accepted: Accepted
+    rejected: Rejected
+    rejected-permanently: Rejected Permanently
   pagination:
     previous: Previous
     next: Next
@@ -352,6 +360,7 @@ admin:
     view-order: View order
     warehouse:
       crunching: Crunching numbers...
+      empty: No completed orders yet.
       expenditure-label: Total expenditure (completed)
       contents: Contents
       labor: Labor
@@ -364,6 +373,13 @@ admin:
       status: Status
       placed: Placed
       open: Open
+    status-filter:
+      all: All statuses
+      pending: Pending
+      approved: Approved
+      rejected: Rejected
+      failed: Failed
+      cancelled: Cancelled
   order-detail:
     page-title: Order details
     breadcrumb: Orders

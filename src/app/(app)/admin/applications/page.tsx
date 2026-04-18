@@ -4,10 +4,18 @@ import { getLocale, getTranslations } from "next-intl/server";
 
 import { Pagination } from "@/components/admin/pagination";
 import { SearchBar } from "@/components/admin/search-bar";
+import { StatusFilter } from "@/components/admin/status-filter";
 import { SlackAvatar } from "@/components/admin/slack-profile";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { pillVariants } from "@/components/ui/pill";
 import { getTranslatedPageMetadata } from "@/i18n/metadata";
+import {
+  APPLICATION_STATUS_ACCEPTED,
+  APPLICATION_STATUS_PENDING_AUTOMATIC_CHECKS,
+  APPLICATION_STATUS_PENDING_REVIEW,
+  APPLICATION_STATUS_REJECTED,
+  APPLICATION_STATUS_REJECTED_PERMANENT,
+} from "@/lib/applications/status";
 import sql from "@/lib/database/client";
 import { ensureSchema } from "@/lib/database/ensure-schema";
 
@@ -33,6 +41,14 @@ type ApplicationListRow = {
   slack_name: string | null;
 };
 
+const APPLICATION_STATUS_FILTER_OPTIONS = [
+  { value: APPLICATION_STATUS_PENDING_AUTOMATIC_CHECKS, labelKey: "admin.status-filter.pending-automatic-checks" },
+  { value: APPLICATION_STATUS_PENDING_REVIEW, labelKey: "admin.status-filter.pending-review" },
+  { value: APPLICATION_STATUS_ACCEPTED, labelKey: "admin.status-filter.accepted" },
+  { value: APPLICATION_STATUS_REJECTED, labelKey: "admin.status-filter.rejected" },
+  { value: APPLICATION_STATUS_REJECTED_PERMANENT, labelKey: "admin.status-filter.rejected-permanently" },
+] as const;
+
 export async function generateMetadata(): Promise<Metadata> {
   return getTranslatedPageMetadata("admin.applications-list.metadata.title");
 }
@@ -40,7 +56,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function AdminApplicationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; q?: string }>;
+  searchParams: Promise<{ page?: string; q?: string; status?: string }>;
 }) {
   const [t, locale, query] = await Promise.all([getTranslations(), getLocale(), searchParams]);
   await ensureSchema();
@@ -49,6 +65,8 @@ export default async function AdminApplicationsPage({
   const offset = (page - 1) * 20;
   const search = query.q?.trim() ?? "";
   const searchFilter = search ? `%${search}%` : null;
+  const statusFilter = query.status?.trim() ?? "";
+  const filterByStatus = statusFilter !== "" ? statusFilter : null;
 
   const [applications, countResult] = await Promise.all([
     sql<ApplicationListRow[]>`
@@ -76,6 +94,9 @@ export default async function AdminApplicationsPage({
         OR u.slack_id ILIKE ${searchFilter}
         OR u.slack_name ILIKE ${searchFilter}
       ))
+      AND (
+        ${filterByStatus}::text IS NULL OR a.status = ${filterByStatus}
+      )
       ORDER BY a.created_at DESC
       LIMIT ${20} OFFSET ${offset}
     `,
@@ -92,6 +113,9 @@ export default async function AdminApplicationsPage({
         OR u.slack_id ILIKE ${searchFilter}
         OR u.slack_name ILIKE ${searchFilter}
       ))
+      AND (
+        ${filterByStatus}::text IS NULL OR a.status = ${filterByStatus}
+      )
     `,
   ]);
 
@@ -102,7 +126,20 @@ export default async function AdminApplicationsPage({
       <header className="space-y-2">
         <h1 className="text-4xl text-white">{t("admin.applications-list.title")}</h1>
       </header>
-      <SearchBar placeholder={t("admin.search-placeholder")} />
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="w-full max-w-sm">
+          <SearchBar placeholder={t("admin.search-placeholder")} />
+        </div>
+        <div className="w-full sm:ml-auto sm:w-auto">
+          <StatusFilter
+            placeholder={t("admin.status-filter.all")}
+            options={APPLICATION_STATUS_FILTER_OPTIONS.map((option) => ({
+              value: option.value,
+              label: t(option.labelKey),
+            }))}
+          />
+        </div>
+      </div>
       <div className="overflow-x-auto border border-white/10 bg-card p-3 md:p-4">
         <table className="w-full text-left">
           <thead>

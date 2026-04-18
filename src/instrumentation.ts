@@ -13,6 +13,10 @@ export async function register() {
   const { startAirtableSyncScheduler } = await import(
     "@/lib/applications/airtable-sync-scheduler"
   );
+  const { startHcbGrantScheduler } = await import(
+    "@/lib/hcb/grant-scheduler"
+  );
 
   startAirtableSyncScheduler();
+  startHcbGrantScheduler();
 }

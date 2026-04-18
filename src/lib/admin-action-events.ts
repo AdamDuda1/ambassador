@@ -4,9 +4,13 @@ import sql from "@/lib/database/client";
 
 export type AdminActionEvent =
   | "application_deleted"
+  | "hcb_credentials_reauthorized"
   | "application_tshirt_sent_updated"
   | "user_impersonation_started"
   | "user_impersonation_stopped"
+  | "user_hcb_grant_linked"
+  | "user_hcb_grant_provisioned"
+  | "user_hcb_grant_unlinked"
   | "user_manual_dashboard_state_updated"
   | "user_posters_enabled_updated"
   | "user_promoted_to_admin";

@@ -20,46 +20,63 @@ type PieSlice = {
   fill: string;
 };
 
+function isWarehouseStatsData(value: unknown): value is WarehouseStatsData {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const expenditure = Reflect.get(value, "expenditure");
+  const completedOrders = Reflect.get(value, "completedOrders");
+
+  return (
+    typeof expenditure === "object" &&
+    expenditure !== null &&
+    typeof Reflect.get(expenditure, "contents") === "number" &&
+    typeof Reflect.get(expenditure, "labor") === "number" &&
+    typeof Reflect.get(expenditure, "postage") === "number" &&
+    typeof Reflect.get(expenditure, "total") === "number" &&
+    typeof completedOrders === "number"
+  );
+}
+
 export function WarehouseStats({ locale }: { locale: string }) {
   const t = useTranslations("admin.orders.warehouse");
   const [data, setData] = useState<WarehouseStatsData | null>(null);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
   useEffect(() => {
-    fetch("/api/admin/warehouse-stats")
-      .then((res) => {
-        if (!res.ok) return null;
-        return res.json() as Promise<unknown>;
-      })
-      .then((result) => {
-        if (
-          typeof result === "object" &&
-          result !== null &&
-          "expenditure" in result &&
-          typeof result.expenditure === "object" &&
-          result.expenditure !== null &&
-          "contents" in result.expenditure &&
-          typeof result.expenditure.contents === "number" &&
-          "labor" in result.expenditure &&
-          typeof result.expenditure.labor === "number" &&
-          "postage" in result.expenditure &&
-          typeof result.expenditure.postage === "number" &&
-          "total" in result.expenditure &&
-          typeof result.expenditure.total === "number" &&
-          "completedOrders" in result &&
-          typeof result.completedOrders === "number"
-        ) {
-          setData({
-            expenditure: {
-              contents: result.expenditure.contents,
-              labor: result.expenditure.labor,
-              postage: result.expenditure.postage,
-              total: result.expenditure.total,
-            },
-            completedOrders: result.completedOrders,
-          });
+    let cancelled = false;
+
+    async function loadStats() {
+      try {
+        const response = await fetch("/api/admin/warehouse-stats", {
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          return;
         }
-      })
-      .catch(() => setData(null));
+
+        const result = await response.json() as unknown;
+        if (!cancelled && isWarehouseStatsData(result)) {
+          setData(result);
+        }
+      } catch {
+        if (!cancelled) {
+          setData(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setHasLoaded(true);
+        }
+      }
+    }
+
+    void loadStats();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const currencyFmt = new Intl.NumberFormat(locale, {
@@ -68,70 +85,76 @@ export function WarehouseStats({ locale }: { locale: string }) {
     minimumFractionDigits: 2,
   });
 
-  if (data === null) {
+  if (!hasLoaded) {
     return <p className="font-body text-sm text-white/50">{t("crunching")}</p>;
   }
 
+  if (data === null) {
+    return null;
+  }
+
+  const pieData = [
+    { name: t("contents"), value: data.expenditure.contents, fill: "var(--chart-applications)" },
+    { name: t("labor"), value: data.expenditure.labor, fill: "var(--chart-signups)" },
+    { name: t("postage"), value: data.expenditure.postage, fill: "var(--chart-approved)" },
+  ];
+
   return (
     <div className="space-y-4">
-      <div className="grid gap-6 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+      <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex flex-col gap-3">
-          {/* Shirt stock block temporarily hidden. */}
-          <div className="flex flex-col gap-3">
-            <div>
-              <p className="font-body text-sm text-secondary">{t("expenditure-label")}</p>
-              <p className="text-2xl text-white">{currencyFmt.format(data.expenditure.total)}</p>
-            </div>
-            <div className="space-y-1 font-body text-sm text-white">
-              <div className="flex items-center gap-2">
-                <span className="size-2 rounded-full" style={{ backgroundColor: "var(--chart-applications)" }} />
-                <span>{t("contents")}</span>
-                <span className="ml-auto">{currencyFmt.format(data.expenditure.contents)}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="size-2 rounded-full" style={{ backgroundColor: "var(--chart-signups)" }} />
-                <span>{t("labor")}</span>
-                <span className="ml-auto">{currencyFmt.format(data.expenditure.labor)}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="size-2 rounded-full" style={{ backgroundColor: "var(--chart-approved)" }} />
-                <span>{t("postage")}</span>
-                <span className="ml-auto">{currencyFmt.format(data.expenditure.postage)}</span>
-              </div>
-            </div>
-            <p className="font-body text-xs text-white/50">
-              {t("completed-orders", { count: data.completedOrders })}
-            </p>
+          <div>
+            <p className="font-body text-sm text-secondary">{t("expenditure-label")}</p>
+            <p className="text-2xl text-white">{currencyFmt.format(data.expenditure.total)}</p>
           </div>
+          <div className="space-y-1 font-body text-sm text-white">
+            <div className="flex items-center gap-2">
+              <span className="size-2 rounded-full" style={{ backgroundColor: "var(--chart-applications)" }} />
+              <span>{t("contents")}</span>
+              <span className="ml-auto">{currencyFmt.format(data.expenditure.contents)}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="size-2 rounded-full" style={{ backgroundColor: "var(--chart-signups)" }} />
+              <span>{t("labor")}</span>
+              <span className="ml-auto">{currencyFmt.format(data.expenditure.labor)}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="size-2 rounded-full" style={{ backgroundColor: "var(--chart-approved)" }} />
+              <span>{t("postage")}</span>
+              <span className="ml-auto">{currencyFmt.format(data.expenditure.postage)}</span>
+            </div>
+          </div>
+          <p className="font-body text-xs text-white/50">
+            {t("completed-orders", { count: data.completedOrders })}
+          </p>
         </div>
 
-        <div className="h-48 min-w-0">
-          <ExpenditurePie
-            data={[
-              { name: t("contents"), value: data.expenditure.contents, fill: "var(--chart-applications)" },
-              { name: t("labor"), value: data.expenditure.labor, fill: "var(--chart-signups)" },
-              { name: t("postage"), value: data.expenditure.postage, fill: "var(--chart-approved)" },
-            ]}
-            locale={locale}
-          />
+        <div className="h-48 w-48 shrink-0">
+          <ExpenditurePie data={pieData} locale={locale} />
         </div>
       </div>
     </div>
   );
 }
 
-function ExpenditurePie({ data, locale }: { data: PieSlice[]; locale: string }) {
+function ExpenditurePie({
+  data,
+  locale,
+}: {
+  data: PieSlice[];
+  locale: string;
+}) {
   const nonZero = data.filter((d) => d.value > 0);
-
-  if (nonZero.length === 0) {
-    return null;
-  }
+  const chartData =
+    nonZero.length > 0
+      ? nonZero
+      : [{ name: "empty", value: 1, fill: "var(--border)" }];
 
   return (
     <ResponsiveContainer width="100%" height="100%" minWidth={0}>
       <PieChart>
         <Pie
-          data={nonZero}
+          data={chartData}
           dataKey="value"
           nameKey="name"
           cx="50%"
@@ -140,15 +163,17 @@ function ExpenditurePie({ data, locale }: { data: PieSlice[]; locale: string }) 
           outerRadius={80}
           strokeWidth={0}
         >
-          {nonZero.map((entry) => (
+          {chartData.map((entry) => (
             <Cell key={entry.name} fill={entry.fill} />
           ))}
         </Pie>
-        <Tooltip
-          content={
-            <PieTooltip locale={locale} />
-          }
-        />
+        {nonZero.length > 0 ? (
+          <Tooltip
+            content={
+              <PieTooltip locale={locale} />
+            }
+          />
+        ) : null}
       </PieChart>
     </ResponsiveContainer>
   );
@@ -176,7 +201,7 @@ function PieTooltip({
   });
 
   return (
-    <div className="rounded-xl border border-white bg-black px-4 py-3">
+    <div className="border border-white/10 bg-card px-4 py-3">
       <div className="space-y-2">
         {payload.map((item) => (
           <div key={item.name} className="flex items-center justify-between gap-6">

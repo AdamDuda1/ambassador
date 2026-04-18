@@ -1,42 +1,26 @@
 import "server-only";
 
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
-
-import { requireEnv } from "@/lib/env";
-
-const ENCRYPTED_PREFIX = "enc:v1";
-const ENCRYPTION_CONTEXT = "ambassador:hca-access-token";
-const GCM_AUTH_TAG_LENGTH = 16;
-
-function getEncryptionKey() {
-  return createHash("sha256")
-    .update(`${ENCRYPTION_CONTEXT}:${requireEnv("JWT_SECRET")}`)
-    .digest();
-}
+import {
+  AUTH_TOKEN_ENCRYPTION_CONTEXT,
+  decryptToken,
+  encryptToken,
+  isEncryptedToken,
+} from "@/lib/token-encryption";
 
 export function isEncryptedHcaAccessToken(value: string | null | undefined) {
-  return Boolean(value?.startsWith(`${ENCRYPTED_PREFIX}:`));
+  return isEncryptedToken(value);
 }
 
 export function encryptHcaAccessToken(token: string) {
-  const trimmedToken = token.trim();
-  if (!trimmedToken) {
-    throw new Error("Cannot encrypt an empty HCA access token");
+  try {
+    return encryptToken(token, AUTH_TOKEN_ENCRYPTION_CONTEXT);
+  } catch (error) {
+    if (error instanceof Error && error.message === "Cannot encrypt an empty token") {
+      throw new Error("Cannot encrypt an empty HCA access token");
+    }
+
+    throw error;
   }
-
-  const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", getEncryptionKey(), iv, {
-    authTagLength: GCM_AUTH_TAG_LENGTH,
-  });
-  const ciphertext = Buffer.concat([cipher.update(trimmedToken, "utf8"), cipher.final()]);
-  const authTag = cipher.getAuthTag();
-
-  return [
-    ENCRYPTED_PREFIX,
-    iv.toString("base64url"),
-    authTag.toString("base64url"),
-    ciphertext.toString("base64url"),
-  ].join(":");
 }
 
 export function readHcaAccessToken(value: string | null | undefined) {
@@ -47,38 +31,12 @@ export function readHcaAccessToken(value: string | null | undefined) {
     return token;
   }
 
-  const parts = token.split(":");
-  if (
-    parts.length !== 5 ||
-    parts[0] !== "enc" ||
-    parts[1] !== "v1"
-  ) {
+  const plaintext = decryptToken(token, AUTH_TOKEN_ENCRYPTION_CONTEXT);
+
+  if (plaintext === null) {
     console.error("Stored HCA access token has an invalid encrypted format");
     return null;
   }
 
-  const [, , ivValue, authTagValue, ciphertextValue] = parts;
-
-  try {
-    const decipher = createDecipheriv(
-      "aes-256-gcm",
-      getEncryptionKey(),
-      Buffer.from(ivValue, "base64url"),
-      {
-        authTagLength: GCM_AUTH_TAG_LENGTH,
-      },
-    );
-
-    decipher.setAuthTag(Buffer.from(authTagValue, "base64url"));
-
-    const plaintext = Buffer.concat([
-      decipher.update(Buffer.from(ciphertextValue, "base64url")),
-      decipher.final(),
-    ]).toString("utf8");
-
-    return plaintext || null;
-  } catch (error) {
-    console.error("Failed to decrypt stored HCA access token", { error });
-    return null;
-  }
+  return plaintext;
 }
