@@ -277,7 +277,9 @@ export default async function AdminApplicationDetailPage({
                   {t("admin.application-detail.latest-application")}
                 </span>
               ) : (
-                <span className="text-sm text-white">{t("admin.application-detail.historical-application")}</span>
+                <span className={pillVariants({ tone: "black" })}>
+                  {t("admin.application-detail.historical-application")}
+                </span>
               )}
             </div>
           </div>
@@ -301,7 +303,7 @@ export default async function AdminApplicationDetailPage({
             <Link
               href={`/admin/applications/${application.latest_application_id}`}
               aria-label={t("admin.application-detail.locked.cta")}
-              className="ui-open-link inline-flex"
+              className="ui-open-link ml-2 inline-flex"
             >
               <span aria-hidden="true">↗</span>
             </Link>
