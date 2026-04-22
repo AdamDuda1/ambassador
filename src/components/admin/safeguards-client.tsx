@@ -70,7 +70,7 @@ export function SafeguardsClient({
             <tr className="border-b border-white">
               <th className="px-5 py-4 font-body text-base text-secondary">{columns.flag}</th>
               <th className="px-5 py-4 font-body text-base text-secondary">{columns.description}</th>
-              <th className="px-5 py-4 font-body text-base text-secondary">{columns.toggle}</th>
+              <th className="px-5 py-4 font-body text-base text-secondary text-center">{columns.toggle}</th>
             </tr>
           </thead>
           <tbody>
@@ -82,7 +82,7 @@ export function SafeguardsClient({
                 <tr key={control.key} className="border-b border-white">
                   <td className="px-5 py-4 font-body text-base text-white">{control.title}</td>
                   <td className="px-5 py-4 font-body text-sm text-secondary">{control.description}</td>
-                  <td className="px-5 py-4">
+                  <td className="px-5 py-4 text-center">
                     <button
                       type="button"
                       data-slot="icon-link"
