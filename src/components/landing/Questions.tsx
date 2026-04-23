@@ -4,9 +4,15 @@ const questions = [
     answers: (
       <>
         <p>
-          Help spread the word about Hack Club in your country! Put up posters
-          to encourage teens to check out our events, with your unique QR code
-          on them.
+          Help spread the word about Hack Club in your country! 
+          <ul className="space-y-2 pl-6 list-disc">
+            <li>
+              Put up posters around your city advertising The Stardance Challenge.
+            </li>
+            <li>
+              Share your referral links with likeminded teens in your city.
+            </li>
+          </ul>
         </p>
       </>
     ),
