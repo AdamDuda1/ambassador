@@ -94,7 +94,7 @@ dashboard:
         body: Thank you for submitting your onboarding information! You will receive a contract via email shortly.
       pending-signature:
         title: "Contract pending signature:"
-        body: Your contract is pending one or more signatures. Please make sure you and your guardian (if applicable) have signed it.
+        body: Your contract is pending one or more signatures. Please make sure you have signed it and wait patiently while we process it on our end.
       completed:
         title: "Onboarding complete:"
         body: Onboarding is done.
