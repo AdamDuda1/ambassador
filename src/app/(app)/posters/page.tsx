@@ -8,7 +8,7 @@ import { ensureSchema } from "@/lib/database/ensure-schema";
 import { canAccessPosters, getPosterAccessState } from "@/lib/posters/access";
 import { listPosterCampaigns } from "@/lib/posters/config";
 import { listPosterDataForUser } from "@/lib/posters/service";
-import { getSafeguards } from "@/lib/safeguards";
+import { getEffectiveSafeguards } from "@/lib/safeguards";
 import { getSession } from "@/lib/session";
 import { canAccessStardanceReferrals } from "@/lib/stardance-referrals";
 
@@ -26,7 +26,7 @@ export default async function PostersPage() {
 
   const [user, safeguards] = await Promise.all([
     getPosterAccessState(session.sub),
-    getSafeguards(),
+    getEffectiveSafeguards(session.sub),
   ]);
   const canAccessAdmin = Boolean(session.impersonator) || Boolean(user?.is_admin ?? session.isAdmin);
   const canUsePosters = canAccessPosters({
@@ -34,7 +34,7 @@ export default async function PostersPage() {
     manualDashboardState: user?.manual_dashboard_state ?? null,
   });
 
-  if (!canUsePosters) {
+  if (!canUsePosters || !safeguards.postersEnabled || user === null) {
     forbidden();
   }
 
@@ -42,22 +42,6 @@ export default async function PostersPage() {
     latestApplicationStatus: user?.latest_application_status ?? null,
     manualDashboardState: user?.manual_dashboard_state ?? null,
   });
-
-  if (!safeguards.postersEnabled || user === null || user.posters_enabled !== true) {
-    return (
-      <main className="page-shell">
-        <Navbar
-          isAdmin={canAccessAdmin}
-          balanceCents={user?.balance_cents ?? 0}
-          showPostersLink={safeguards.postersEnabled && user?.posters_enabled === true}
-          showReferralsLink={showReferralsLink}
-        />
-        <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-12">
-          <h1 className="font-sub text-4xl text-foreground">{t("posters.unavailable")}</h1>
-        </div>
-      </main>
-    );
-  }
 
   const data = await listPosterDataForUser(session.sub);
 

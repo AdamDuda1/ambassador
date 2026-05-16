@@ -1,7 +1,7 @@
 import { getRequestIp, isSameOriginRequest } from "@/lib/http";
 import { canAccessPosters, getPosterAccessState } from "@/lib/posters/access";
 import { ensureSchema } from "@/lib/database/ensure-schema";
-import { getSafeguards } from "@/lib/safeguards";
+import { getEffectiveSafeguards } from "@/lib/safeguards";
 import { getSession } from "@/lib/session";
 
 export { getRequestIp, isSameOriginRequest };
@@ -26,7 +26,7 @@ export async function requirePosterSession() {
   await ensureSchema();
   const [user, safeguards] = await Promise.all([
     getPosterAccessState(session.sub),
-    getSafeguards(),
+    getEffectiveSafeguards(session.sub),
   ]);
 
   if (!user) {
@@ -42,7 +42,7 @@ export async function requirePosterSession() {
     throw new PosterRequestError("Forbidden", 403);
   }
 
-  if (!safeguards.postersEnabled || user.posters_enabled !== true) {
+  if (!safeguards.postersEnabled) {
     throw new PosterRequestError("Coming soon!", 403);
   }
 

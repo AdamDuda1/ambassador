@@ -137,7 +137,6 @@ posters:
     title: Posters
   heading: Posters
   subheading: Spread the word!
-  unavailable: Coming soon!
   stats:
     total: total
     verified: verified
@@ -242,7 +241,6 @@ referrals:
     title: Referrals
   heading: Your referrals
   subheading: Find your referral links here.
-  unavailable: Coming soon!
   codes:
     heading: Referral codes
     description: You can make extra referral codes too and you can track them here!also
@@ -466,6 +464,17 @@ admin:
       description: Description
     errors:
       update-failed: Could not update that flag.
+      override-failed: Could not update that override.
+    overrides:
+      heading: User Overrides
+      empty: No overrides yet.
+      add-label: Add user
+      add-placeholder: User email or ID
+      add-button: Add
+      remove-label: Remove override
+      remove-confirm: Remove this override?
+      not-found: Could not find that user.
+      already-exists: That user already has this override.
     onboarding:
       title: Onboarding
       description: Allow accepted ambassadors to start onboarding from their dashboard.
@@ -883,7 +892,6 @@ admin:
       permanent-rejection-note-label: Permanent rejection note
       permanent-rejection-note-placeholder: Optional context for permanent rejection
       reject-permanently: Reject permanently
-      save-flags: Save flags
       save-note: Save note
       no-review-target: This user does not have any applications yet, so there is no review target to update.
     superuser:
@@ -899,7 +907,14 @@ admin:
       cleared: Note cleared
       unknown-actor: Unknown admin
     flags:
-      posters-enabled: Enable posters page
+      onboarding-enabled: Onboarding
+      shirt-ordering-enabled: Shirt ordering
+      posters-enabled: Posters
+      referrals-enabled: Referrals
+      override-active: Override active (always enabled for this user)
+      override-inactive: No override (uses global flag)
+      grant-override: Grant override
+      remove-override: Remove override
     dashboard-state:
       current-manual-state: Current manual state
       no-manual-state: No manual state set
@@ -930,7 +945,6 @@ admin:
       coordinates: Coordinates
       last-seen-ip: Last seen IP
       admin: Admin
-      posters-enabled: Posters enabled
       manual-dashboard-state: Manual dashboard state
       created: Created
       updated: Updated

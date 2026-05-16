@@ -638,7 +638,7 @@ function ReferralCodeRow({
                 {heading}
               </span>
               <span className="font-body text-base text-white">
-                <span aria-hidden>a!</span>
+                <span aria-hidden>a</span>
                 <span>{referralCode.code}</span>
               </span>
               <span className="font-body text-sm text-muted-foreground">
@@ -751,7 +751,7 @@ function ArchivedReferralCodeRow({
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
             <span className="font-body text-base text-white">{referralCode.label}</span>
             <span className="font-body text-base text-white">
-              <span aria-hidden>a!</span>
+              <span aria-hidden>a</span>
               <span>{referralCode.code}</span>
             </span>
             <span className="font-body text-sm text-muted-foreground">

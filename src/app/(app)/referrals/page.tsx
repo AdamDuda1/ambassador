@@ -7,7 +7,7 @@ import { getTranslatedPageMetadata } from "@/i18n/metadata";
 import sql from "@/lib/database/client";
 import { ensureSchema } from "@/lib/database/ensure-schema";
 import { canAccessPosters } from "@/lib/posters/access";
-import { getSafeguards } from "@/lib/safeguards";
+import { getEffectiveSafeguards } from "@/lib/safeguards";
 import { getSession } from "@/lib/session";
 import {
   canAccessStardanceReferrals,
@@ -22,7 +22,6 @@ import { ReferralsClient } from "./ReferralsClient";
 type ReferralsAccessRow = {
   balance_cents: number | null;
   is_admin: boolean | null;
-  posters_enabled: boolean | null;
   manual_dashboard_state: string | null;
   latest_application_status: string | null;
 };
@@ -36,13 +35,15 @@ export default async function ReferralsPage() {
   if (!session) redirect("/");
 
   await ensureSchema();
-  const [t, safeguards] = await Promise.all([getTranslations(), getSafeguards()]);
+  const [t, safeguards] = await Promise.all([
+    getTranslations(),
+    getEffectiveSafeguards(session.sub),
+  ]);
 
   const user = (await sql<ReferralsAccessRow[]>`
     SELECT
       balance_cents,
       is_admin,
-      posters_enabled,
       manual_dashboard_state,
       (
         SELECT status
@@ -61,7 +62,7 @@ export default async function ReferralsPage() {
     manualDashboardState: user?.manual_dashboard_state ?? null,
   });
 
-  if (!canUseReferrals) {
+  if (!canUseReferrals || !safeguards.referralsEnabled) {
     forbidden();
   }
 
@@ -69,27 +70,10 @@ export default async function ReferralsPage() {
     Boolean(session.impersonator) || Boolean(user?.is_admin ?? session.isAdmin);
   const showPostersLink =
     safeguards.postersEnabled &&
-    user?.posters_enabled === true &&
     canAccessPosters({
       latestApplicationStatus: user?.latest_application_status ?? null,
       manualDashboardState: user?.manual_dashboard_state ?? null,
     });
-
-  if (!safeguards.referralsEnabled) {
-    return (
-      <main className="page-shell">
-        <Navbar
-          isAdmin={canAccessAdmin}
-          balanceCents={user?.balance_cents ?? 0}
-          showPostersLink={showPostersLink}
-          showReferralsLink={false}
-        />
-        <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-12">
-          <h1 className="text-4xl text-white">{t("referrals.unavailable")}</h1>
-        </div>
-      </main>
-    );
-  }
 
   const referralCodes = await listStardanceReferralCodesForUser(session.sub);
   await seedFakeStardanceReferralsForUser(session.sub);

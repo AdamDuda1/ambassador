@@ -139,3 +139,117 @@ function toSafeguardState(
     updatedByUserId: row?.updated_by_user_id ?? null,
   };
 }
+
+export type UserFeatureFlagOverride = {
+  userId: string;
+  flagKey: SafeguardKey;
+  createdAt: string;
+  createdByUserId: string | null;
+};
+
+export type UserFeatureFlagOverrideWithUser = UserFeatureFlagOverride & {
+  displayName: string;
+  email: string | null;
+  slackId: string | null;
+};
+
+type OverrideRow = {
+  user_id: string;
+  flag_key: string;
+  created_at: string;
+  created_by_user_id: string | null;
+};
+
+type OverrideRowWithUser = OverrideRow & {
+  display_name: string;
+  email: string | null;
+  slack_id: string | null;
+};
+
+export async function getOverrideFlagsForUser(userId: string): Promise<Set<SafeguardKey>> {
+  const rows = await sql<{ flag_key: string }[]>`
+    SELECT flag_key
+    FROM user_feature_flag_overrides
+    WHERE user_id = ${userId}
+  `;
+  const keys = new Set<SafeguardKey>();
+  for (const row of rows) {
+    if (isSafeguardKey(row.flag_key)) {
+      keys.add(row.flag_key);
+    }
+  }
+  return keys;
+}
+
+export async function getEffectiveSafeguards(userId: string | null): Promise<Safeguards> {
+  const safeguards = await getSafeguards();
+  if (userId === null) return safeguards;
+
+  const overrides = await getOverrideFlagsForUser(userId);
+  return {
+    onboardingEnabled: safeguards.onboardingEnabled || overrides.has(SAFEGUARD_KEYS.onboardingEnabled),
+    shirtOrderingEnabled: safeguards.shirtOrderingEnabled || overrides.has(SAFEGUARD_KEYS.shirtOrderingEnabled),
+    postersEnabled: safeguards.postersEnabled || overrides.has(SAFEGUARD_KEYS.postersEnabled),
+    referralsEnabled: safeguards.referralsEnabled || overrides.has(SAFEGUARD_KEYS.referralsEnabled),
+  };
+}
+
+export async function listOverridesGroupedByFlag(): Promise<
+  Record<SafeguardKey, UserFeatureFlagOverrideWithUser[]>
+> {
+  const rows = await sql<OverrideRowWithUser[]>`
+    SELECT o.user_id, o.flag_key, o.created_at, o.created_by_user_id,
+           u.display_name, u.email, u.slack_id
+    FROM user_feature_flag_overrides o
+    JOIN users u ON u.id = o.user_id
+    ORDER BY u.display_name ASC, o.created_at ASC
+  `;
+
+  const grouped: Record<SafeguardKey, UserFeatureFlagOverrideWithUser[]> = {
+    [SAFEGUARD_KEYS.onboardingEnabled]: [],
+    [SAFEGUARD_KEYS.shirtOrderingEnabled]: [],
+    [SAFEGUARD_KEYS.postersEnabled]: [],
+    [SAFEGUARD_KEYS.referralsEnabled]: [],
+  };
+
+  for (const row of rows) {
+    if (!isSafeguardKey(row.flag_key)) continue;
+    grouped[row.flag_key].push({
+      userId: row.user_id,
+      flagKey: row.flag_key,
+      createdAt: row.created_at,
+      createdByUserId: row.created_by_user_id,
+      displayName: row.display_name,
+      email: row.email,
+      slackId: row.slack_id,
+    });
+  }
+
+  return grouped;
+}
+
+export async function addUserFeatureFlagOverride(input: {
+  userId: string;
+  flagKey: SafeguardKey;
+  createdByUserId: string | null;
+}): Promise<boolean> {
+  const rows = await sql<OverrideRow[]>`
+    INSERT INTO user_feature_flag_overrides (user_id, flag_key, created_by_user_id)
+    VALUES (${input.userId}, ${input.flagKey}, ${input.createdByUserId})
+    ON CONFLICT DO NOTHING
+    RETURNING user_id, flag_key, created_at, created_by_user_id
+  `;
+  return rows.length > 0;
+}
+
+export async function removeUserFeatureFlagOverride(input: {
+  userId: string;
+  flagKey: SafeguardKey;
+}): Promise<boolean> {
+  const rows = await sql<OverrideRow[]>`
+    DELETE FROM user_feature_flag_overrides
+    WHERE user_id = ${input.userId} AND flag_key = ${input.flagKey}
+    RETURNING user_id, flag_key, created_at, created_by_user_id
+  `;
+  return rows.length > 0;
+}

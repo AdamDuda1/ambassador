@@ -34,10 +34,22 @@ import { getCachedHackatimeTrustLevel } from "@/lib/hackatime";
 import { readHcaAccessToken } from "@/lib/hca-access-token";
 import { ensureUserAddressSchema } from "@/lib/database/user-address-schema";
 import {
+  getOverrideFlagsForUser,
+  SAFEGUARD_KEYS,
+  type SafeguardKey,
+} from "@/lib/safeguards";
+import {
   getUserManualDashboardStateLabel,
   isUserManualDashboardState,
 } from "@/lib/user-dashboard-state";
 import { getActorSession } from "@/lib/session";
+
+const USER_FLAG_CONTROLS: { key: SafeguardKey; labelKey: string }[] = [
+  { key: SAFEGUARD_KEYS.onboardingEnabled, labelKey: "admin.user-detail.flags.onboarding-enabled" },
+  { key: SAFEGUARD_KEYS.shirtOrderingEnabled, labelKey: "admin.user-detail.flags.shirt-ordering-enabled" },
+  { key: SAFEGUARD_KEYS.postersEnabled, labelKey: "admin.user-detail.flags.posters-enabled" },
+  { key: SAFEGUARD_KEYS.referralsEnabled, labelKey: "admin.user-detail.flags.referrals-enabled" },
+];
 import { normalizeHackClubAddresses } from "@/lib/settings";
 import { isSuperuserConfigured } from "@/lib/superuser";
 
@@ -61,7 +73,6 @@ type AdminUserRow = {
   org: string | null;
   hca_addresses: unknown;
   hca_access_token: string | null;
-  posters_enabled: boolean | null;
   permanently_rejected_at: string | null;
   permanent_rejection_note: string | null;
   created_at: string;
@@ -150,7 +161,7 @@ export default async function AdminUserDetailPage({
            slack_avatar_url, verification_status, is_admin, last_ip, latitude, longitude, city,
            region, country_code, country_name, postal_code, timezone, org, hca_addresses,
            hca_access_token,
-           posters_enabled, manual_dashboard_state,
+           manual_dashboard_state,
            permanently_rejected_at, permanent_rejection_note, created_at, updated_at
     FROM users
     WHERE id = ${id}
@@ -158,6 +169,8 @@ export default async function AdminUserDetailPage({
   `).at(0);
 
   if (!user) notFound();
+
+  const userOverrideKeys = await getOverrideFlagsForUser(user.id);
 
   const storedAddresses = Array.isArray(user.hca_addresses)
     ? user.hca_addresses.filter(
@@ -553,24 +566,41 @@ export default async function AdminUserDetailPage({
         title={t("admin.user-detail.sections.flags.title")}
         description={t("admin.user-detail.sections.flags.description")}
       >
-        <form action={`/api/admin/users/${user.id}/flags`} method="POST" className="max-w-xl space-y-4">
-          <input type="hidden" name="redirectTo" value={`/admin/users/${user.id}`} />
-          <label className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              name="postersEnabled"
-              value="true"
-              defaultChecked={user.posters_enabled === true}
-              className="h-4 w-4 accent-primary"
-            />
-            <span className="font-body text-sm text-white">
-              {t("admin.user-detail.flags.posters-enabled")}
-            </span>
-          </label>
-          <button className={buttonVariants({ size: "app" })}>
-            {t("admin.user-detail.actions.save-flags")}
-          </button>
-        </form>
+        <div className="max-w-xl space-y-3">
+          {USER_FLAG_CONTROLS.map((control) => {
+            const enabled = userOverrideKeys.has(control.key);
+            return (
+              <form
+                key={control.key}
+                action={`/api/admin/users/${user.id}/flags`}
+                method="POST"
+                className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3 last:border-b-0"
+              >
+                <input type="hidden" name="redirectTo" value={`/admin/users/${user.id}`} />
+                <input type="hidden" name="flagKey" value={control.key} />
+                <input type="hidden" name="action" value={enabled ? "disable" : "enable"} />
+                <div className="flex flex-col">
+                  <span className="font-body text-sm text-white">{t(control.labelKey)}</span>
+                  <span className="text-xs text-secondary">
+                    {enabled
+                      ? t("admin.user-detail.flags.override-active")
+                      : t("admin.user-detail.flags.override-inactive")}
+                  </span>
+                </div>
+                <button
+                  className={buttonVariants({
+                    size: "app-sm",
+                    variant: enabled ? "default" : "success",
+                  })}
+                >
+                  {enabled
+                    ? t("admin.user-detail.flags.remove-override")
+                    : t("admin.user-detail.flags.grant-override")}
+                </button>
+              </form>
+            );
+          })}
+        </div>
       </DetailSection>
 
       <div id="office-grant">
@@ -829,7 +859,6 @@ export default async function AdminUserDetailPage({
         />
         <DetailFieldRow label={t("admin.user-detail.profile-fields.last-seen-ip")} value={user.last_ip} mono />
         <DetailFieldRow label={t("admin.user-detail.profile-fields.admin")} value={user.is_admin === true ? t("common.yes") : t("common.no")} />
-        <DetailFieldRow label={t("admin.user-detail.profile-fields.posters-enabled")} value={user.posters_enabled === true ? t("common.yes") : t("common.no")} />
         <DetailFieldRow label={t("admin.user-detail.profile-fields.manual-dashboard-state")} value={manualDashboardStateLabel} />
         <DetailFieldRow label={t("admin.user-detail.profile-fields.created")} value={formatDateTime(user.created_at, locale)} />
         <DetailFieldRow label={t("admin.user-detail.profile-fields.updated")} value={formatDateTime(user.updated_at, locale)} />

@@ -17,6 +17,7 @@ export type AdminActionEvent =
   | "user_hcb_grant_unlinked"
   | "user_manual_dashboard_state_updated"
   | "user_posters_enabled_updated"
+  | "user_feature_flag_override_updated"
   | "user_promoted_to_admin";
 
 export async function logAdminActionEvent(input: {

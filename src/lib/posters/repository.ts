@@ -9,6 +9,36 @@ import type {
   PosterVerificationStatus,
 } from "@/lib/posters/types";
 
+let ensurePosterNameColumnPromise: Promise<void> | null = null;
+
+export function ensurePosterNameColumn() {
+  ensurePosterNameColumnPromise ??= (async () => {
+    await sql`
+      ALTER TABLE posters
+      ADD COLUMN IF NOT EXISTS name TEXT
+    `;
+
+    await sql`
+      UPDATE posters
+      SET name = LEFT(NULLIF(BTRIM(metadata->>'name'), ''), 80)
+      WHERE name IS NULL
+        AND jsonb_typeof(metadata->'name') = 'string'
+    `;
+
+    await sql`
+      UPDATE posters
+      SET name = NULL
+      WHERE name IS NOT NULL
+        AND BTRIM(name) = ''
+    `;
+  })().catch((error) => {
+    ensurePosterNameColumnPromise = null;
+    throw error;
+  });
+
+  return ensurePosterNameColumnPromise;
+}
+
 async function referralCodeExists(candidate: string) {
   const row = (await sql<{ exists: boolean }[]>`
     SELECT EXISTS(
@@ -63,6 +93,8 @@ async function generateUniqueQrToken() {
 }
 
 export async function createPoster(input: CreatePosterInput) {
+  await ensurePosterNameColumn();
+
   const posterType = input.posterType ?? "color";
   const id = crypto.randomUUID();
   const referralCode = await generateUniqueReferralCode();
@@ -74,6 +106,7 @@ export async function createPoster(input: CreatePosterInput) {
       user_id,
       poster_group_id,
       campaign_slug,
+      name,
       qr_code_token,
       referral_code,
       poster_type,
@@ -85,6 +118,7 @@ export async function createPoster(input: CreatePosterInput) {
       ${input.userId},
       ${input.posterGroupId ?? null},
       ${input.campaignSlug},
+      ${input.name ?? null},
       ${qrCodeToken},
       ${referralCode},
       ${posterType},
@@ -319,7 +353,7 @@ export async function findPosterByPublicScanCode(scanCode: string) {
     return poster ?? null;
   }
 
-  if (/^AMB-[A-Z1-9]{8}$/i.test(trimmed)) {
+  if (/^(?:a!?[A-Z1-9]{5}|[A-Z1-9]{5}|AMB-[A-Z1-9]{8})$/i.test(trimmed)) {
     return findPosterByReferralCode(trimmed);
   }
 
@@ -397,6 +431,21 @@ export async function updatePosterMetadata(posterId: string, metadata: PosterMet
   const [poster] = await sql<PosterRow[]>`
     UPDATE posters
     SET metadata = CAST(${JSON.stringify(metadata)} AS JSONB), updated_at = NOW()
+    WHERE id = ${posterId}
+    RETURNING *
+  `;
+
+  return poster;
+}
+
+export async function updatePosterName(posterId: string, name: string | null) {
+  await ensurePosterNameColumn();
+
+  const [poster] = await sql<PosterRow[]>`
+    UPDATE posters
+    SET
+      name = ${name},
+      updated_at = NOW()
     WHERE id = ${posterId}
     RETURNING *
   `;

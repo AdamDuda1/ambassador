@@ -35,6 +35,7 @@ export type PosterRow = {
   user_id: string;
   poster_group_id: string | null;
   campaign_slug: string;
+  name: string | null;
   qr_code_token: string;
   referral_code: string;
   poster_type: PosterStyle;
@@ -90,6 +91,7 @@ export type CreatePosterInput = {
   posterType?: PosterStyle;
   posterGroupId?: string | null;
   charset?: PosterGroupCharset;
+  name?: string | null;
   metadata?: PosterMetadata;
 };
 

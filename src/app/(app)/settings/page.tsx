@@ -6,7 +6,7 @@ import { Navbar } from "@/components/navbar";
 import { getTranslatedPageMetadata } from "@/i18n/metadata";
 import sql from "@/lib/database/client";
 import { canAccessPosters, getPosterAccessState } from "@/lib/posters/access";
-import { getSafeguards } from "@/lib/safeguards";
+import { getEffectiveSafeguards } from "@/lib/safeguards";
 import { getSession } from "@/lib/session";
 import { ensureUserAddressSchema } from "@/lib/database/user-address-schema";
 import { canAccessStardanceReferrals } from "@/lib/stardance-referrals";
@@ -48,7 +48,7 @@ export default async function SettingsPage() {
       FROM users WHERE id = ${session.sub}
     `.then((rows) => rows.at(0) ?? null),
     getPosterAccessState(session.sub),
-    getSafeguards(),
+    getEffectiveSafeguards(session.sub),
   ]);
 
   if (!settingsUser) {

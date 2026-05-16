@@ -3,7 +3,7 @@ import { forbidden, unauthorized } from "next/navigation";
 import { AdminTabs } from "@/components/admin/admin-tabs";
 import { Navbar } from "@/components/navbar";
 import { canAccessPosters, getPosterAccessState } from "@/lib/posters/access";
-import { getSafeguards } from "@/lib/safeguards";
+import { getEffectiveSafeguards } from "@/lib/safeguards";
 import { getActorSession } from "@/lib/session";
 import { canAccessStardanceReferrals } from "@/lib/stardance-referrals";
 
@@ -17,7 +17,7 @@ export default async function AdminLayout({
 
   const [user, safeguards] = await Promise.all([
     getPosterAccessState(session.sub),
-    getSafeguards(),
+    getEffectiveSafeguards(session.sub),
   ]);
   if (user === null || user.is_admin !== true) forbidden();
   const showPostersLink = safeguards.postersEnabled && canAccessPosters({

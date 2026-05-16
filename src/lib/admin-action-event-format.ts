@@ -25,6 +25,7 @@ const EVENT_LABELS: Record<AdminActionEvent, string> = {
   user_impersonation_stopped: "Impersonation stopped",
   user_manual_dashboard_state_updated: "Dashboard state updated",
   user_posters_enabled_updated: "Posters access updated",
+  user_feature_flag_override_updated: "Feature flag override updated",
   user_promoted_to_admin: "User made admin",
 };
 
@@ -36,7 +37,9 @@ const METADATA_LABELS: Record<string, string> = {
   authorizedHcbUserId: "Authorized HCB user",
   authorizedHcbUserName: "Authorized HCB name",
   expiresAt: "Expires",
+  flagKey: "Feature flag",
   grantId: "Grant",
+  nextOverrideEnabled: "Override enabled",
   impersonationStartedAt: "Impersonation started",
   nextIsAdmin: "Next admin access",
   nextEnabled: "Next enabled state",
@@ -118,6 +121,8 @@ export function formatAuditEventSummary(event: AuditEventLike): string {
       return `Changed dashboard state from ${formatNullableState(metadata.previousState)} to ${formatNullableState(metadata.nextState)}.`;
     case "user_posters_enabled_updated":
       return `Changed posters access from ${formatBooleanState(metadata.previousPostersEnabled, "enabled", "disabled")} to ${formatBooleanState(metadata.nextPostersEnabled, "enabled", "disabled")}.`;
+    case "user_feature_flag_override_updated":
+      return `${formatBooleanState(metadata.nextOverrideEnabled, "Granted", "Removed")} per-user override for ${formatMetadataValue(metadata.flagKey)}.`;
     case "user_promoted_to_admin":
       return "Granted admin access to this user.";
     default:

@@ -5,14 +5,13 @@ import { isUserManualDashboardState } from "@/lib/user-dashboard-state";
 export type PosterAccessState = {
   balance_cents?: number | null;
   is_admin?: boolean | null;
-  posters_enabled?: boolean | null;
   manual_dashboard_state?: string | null;
   latest_application_status?: string | null;
 };
 
 export async function getPosterAccessState(userId: string): Promise<PosterAccessState | null> {
   const user = (await sql<PosterAccessState[]>`
-    SELECT balance_cents, is_admin, posters_enabled, manual_dashboard_state,
+    SELECT balance_cents, is_admin, manual_dashboard_state,
            (
              SELECT status
              FROM applications

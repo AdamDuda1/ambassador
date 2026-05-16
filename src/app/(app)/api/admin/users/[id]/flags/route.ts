@@ -4,6 +4,11 @@ import { revalidatePath } from "next/cache";
 import sql from "@/lib/database/client";
 import { ensureSchema } from "@/lib/database/ensure-schema";
 import { getSafeRedirectUrl, isSameOriginRequest } from "@/lib/http";
+import {
+  addUserFeatureFlagOverride,
+  isSafeguardKey,
+  removeUserFeatureFlagOverride,
+} from "@/lib/safeguards";
 import { getActorSession } from "@/lib/session";
 
 export async function POST(
@@ -26,39 +31,48 @@ export async function POST(
 
   const { id } = await params;
   const formData = await request.formData();
-  const postersEnabled = formData.has("postersEnabled");
-  const currentUser = (await sql<{ id: string; posters_enabled: boolean | null }[]>`
-    SELECT id, posters_enabled
-    FROM users
-    WHERE id = ${id}
-    LIMIT 1
+  const flagKey = formData.get("flagKey");
+  const action = formData.get("action");
+
+  if (!isSafeguardKey(flagKey) || (action !== "enable" && action !== "disable")) {
+    return Response.json({ error: "invalid_request" }, { status: 400 });
+  }
+
+  const targetUser = (await sql<{ id: string }[]>`
+    SELECT id FROM users WHERE id = ${id} LIMIT 1
   `).at(0) ?? null;
 
-  if (currentUser === null) {
+  if (targetUser === null) {
     return Response.json({ error: "not_found" }, { status: 404 });
   }
 
-  await sql`
-    UPDATE users
-    SET posters_enabled = ${postersEnabled},
-        updated_at = NOW()
-    WHERE id = ${id}
-  `;
+  let changed = false;
+  if (action === "enable") {
+    changed = await addUserFeatureFlagOverride({
+      userId: id,
+      flagKey,
+      createdByUserId: session.sub,
+    });
+  } else {
+    changed = await removeUserFeatureFlagOverride({ userId: id, flagKey });
+  }
 
-  if (Boolean(currentUser.posters_enabled) !== postersEnabled) {
+  if (changed) {
     await logAdminActionEvent({
       actorUserId: session.sub,
       targetUserId: id,
-      action: "user_posters_enabled_updated",
+      action: "user_feature_flag_override_updated",
       metadata: {
-        previousPostersEnabled: Boolean(currentUser.posters_enabled),
-        nextPostersEnabled: postersEnabled,
+        flagKey,
+        nextOverrideEnabled: action === "enable",
       },
     });
   }
 
   revalidatePath(`/admin/users/${id}`);
+  revalidatePath("/admin/safeguards");
   revalidatePath("/posters");
+  revalidatePath("/referrals");
   revalidatePath("/dashboard");
 
   return Response.redirect(getSafeRedirectUrl(request, formData.get("redirectTo"), `/admin/users/${id}`));

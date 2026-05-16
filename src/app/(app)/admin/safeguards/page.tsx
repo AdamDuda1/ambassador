@@ -4,7 +4,11 @@ import { getTranslations } from "next-intl/server";
 import { SafeguardsClient } from "@/components/admin/safeguards-client";
 import { getTranslatedPageMetadata } from "@/i18n/metadata";
 import { ensureSchema } from "@/lib/database/ensure-schema";
-import { listSafeguardStates, SAFEGUARD_KEYS } from "@/lib/safeguards";
+import {
+  listOverridesGroupedByFlag,
+  listSafeguardStates,
+  SAFEGUARD_KEYS,
+} from "@/lib/safeguards";
 
 export async function generateMetadata(): Promise<Metadata> {
   return getTranslatedPageMetadata("admin.safeguards.metadata.title");
@@ -12,7 +16,10 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function AdminSafeguardsPage() {
   const [t] = await Promise.all([getTranslations(), ensureSchema()]);
-  const safeguards = await listSafeguardStates();
+  const [safeguards, overridesByFlag] = await Promise.all([
+    listSafeguardStates(),
+    listOverridesGroupedByFlag(),
+  ]);
   const stateByKey = new Map(safeguards.map((state) => [state.key, state]));
 
   return (
@@ -20,11 +27,25 @@ export default async function AdminSafeguardsPage() {
       <h1 className="text-4xl text-white">{t("admin.safeguards.title")}</h1>
 
       <SafeguardsClient
-        errorMessage={t("admin.safeguards.errors.update-failed")}
+        errorMessages={{
+          update: t("admin.safeguards.errors.update-failed"),
+          override: t("admin.safeguards.errors.override-failed"),
+        }}
         columns={{
           toggle: t("admin.safeguards.columns.toggle"),
           flag: t("admin.safeguards.columns.flag"),
           description: t("admin.safeguards.columns.description"),
+        }}
+        overrides={{
+          heading: t("admin.safeguards.overrides.heading"),
+          empty: t("admin.safeguards.overrides.empty"),
+          addLabel: t("admin.safeguards.overrides.add-label"),
+          addPlaceholder: t("admin.safeguards.overrides.add-placeholder"),
+          addButton: t("admin.safeguards.overrides.add-button"),
+          removeLabel: t("admin.safeguards.overrides.remove-label"),
+          removeConfirm: t("admin.safeguards.overrides.remove-confirm"),
+          notFound: t("admin.safeguards.overrides.not-found"),
+          alreadyExists: t("admin.safeguards.overrides.already-exists"),
         }}
         controls={[
           {
@@ -34,6 +55,11 @@ export default async function AdminSafeguardsPage() {
             enabled: stateByKey.get(SAFEGUARD_KEYS.onboardingEnabled)?.enabled ?? true,
             enableAction: t("admin.safeguards.onboarding.enable"),
             disableAction: t("admin.safeguards.onboarding.disable"),
+            overrides: overridesByFlag[SAFEGUARD_KEYS.onboardingEnabled].map((o) => ({
+              userId: o.userId,
+              displayName: o.displayName,
+              email: o.email,
+            })),
           },
           {
             key: SAFEGUARD_KEYS.shirtOrderingEnabled,
@@ -42,6 +68,11 @@ export default async function AdminSafeguardsPage() {
             enabled: stateByKey.get(SAFEGUARD_KEYS.shirtOrderingEnabled)?.enabled ?? true,
             enableAction: t("admin.safeguards.shirt-ordering.enable"),
             disableAction: t("admin.safeguards.shirt-ordering.disable"),
+            overrides: overridesByFlag[SAFEGUARD_KEYS.shirtOrderingEnabled].map((o) => ({
+              userId: o.userId,
+              displayName: o.displayName,
+              email: o.email,
+            })),
           },
           {
             key: SAFEGUARD_KEYS.postersEnabled,
@@ -50,6 +81,11 @@ export default async function AdminSafeguardsPage() {
             enabled: stateByKey.get(SAFEGUARD_KEYS.postersEnabled)?.enabled ?? true,
             enableAction: t("admin.safeguards.posters.enable"),
             disableAction: t("admin.safeguards.posters.disable"),
+            overrides: overridesByFlag[SAFEGUARD_KEYS.postersEnabled].map((o) => ({
+              userId: o.userId,
+              displayName: o.displayName,
+              email: o.email,
+            })),
           },
           {
             key: SAFEGUARD_KEYS.referralsEnabled,
@@ -58,6 +94,11 @@ export default async function AdminSafeguardsPage() {
             enabled: stateByKey.get(SAFEGUARD_KEYS.referralsEnabled)?.enabled ?? true,
             enableAction: t("admin.safeguards.referrals.enable"),
             disableAction: t("admin.safeguards.referrals.disable"),
+            overrides: overridesByFlag[SAFEGUARD_KEYS.referralsEnabled].map((o) => ({
+              userId: o.userId,
+              displayName: o.displayName,
+              email: o.email,
+            })),
           },
         ]}
       />

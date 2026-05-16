@@ -149,13 +149,14 @@ export function getPosterRenderConfig(
 }
 
 export function normalizePosterReferralCode(referralCode: string) {
-  const code = referralCode.trim().toUpperCase();
-  return code.startsWith("A!") ? code.slice(2) : code;
+  const trimmed = referralCode.trim();
+  const prefixedCode = /^a!?([A-Z1-9]{5})$/i.exec(trimmed);
+  return prefixedCode?.[1]?.toUpperCase() ?? trimmed.toUpperCase();
 }
 
 export function formatPosterReferralCode(referralCode: string) {
   const code = normalizePosterReferralCode(referralCode);
-  return /^[A-Z1-9]{5}$/.test(code) ? `a!${code}` : code;
+  return /^[A-Z1-9]{5}$/.test(code) ? `a${code}` : code;
 }
 
 export function buildPosterReferralUrl(referralCode: string) {

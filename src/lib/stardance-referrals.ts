@@ -3,6 +3,7 @@ import "server-only";
 import { isAcceptedApplicationStatus } from "@/lib/applications/status";
 import sql from "@/lib/database/client";
 import { optionalEnv } from "@/lib/env";
+import { ensurePosterNameColumn } from "@/lib/posters/repository";
 import { isUserManualDashboardState } from "@/lib/user-dashboard-state";
 
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789";
@@ -90,7 +91,7 @@ export function canAccessStardanceReferrals(input: {
 }
 
 export function buildStardanceReferralUrl(code: string) {
-  return `${optionalEnv("STARDANCE_REFERRAL_BASE_URL") ?? STARDANCE_BASE_URL}/a!${code}`;
+  return `${optionalEnv("STARDANCE_REFERRAL_BASE_URL") ?? STARDANCE_BASE_URL}/a${code}`;
 }
 
 function toStardanceReferralCode(
@@ -516,6 +517,8 @@ type StardanceReferralRow = {
   verification_status: StardanceReferralVerificationStatus;
   referred_at: Date;
   referral_code_label: string;
+  poster_id: string | null;
+  poster_name: string | null;
 };
 
 export async function listStardanceReferralsForUser(
@@ -524,6 +527,7 @@ export async function listStardanceReferralsForUser(
 ): Promise<StardanceReferral[]> {
   const query = options.query?.trim() ?? "";
   const pattern = query === "" ? null : `%${query.toLowerCase()}%`;
+  await ensurePosterNameColumn();
 
   const rows = pattern === null
     ? await sql<StardanceReferralRow[]>`
@@ -538,9 +542,12 @@ export async function listStardanceReferralsForUser(
           r.hours_approved::text AS hours_approved,
           r.verification_status,
           r.referred_at,
-          c.label AS referral_code_label
+          c.label AS referral_code_label,
+          p.id AS poster_id,
+          NULLIF(BTRIM(p.name), '') AS poster_name
         FROM stardance_referrals r
         JOIN stardance_referral_codes c ON c.id = r.referral_code_id
+        LEFT JOIN posters p ON p.user_id = r.user_id AND p.referral_code = c.code
         WHERE r.user_id = ${userId}
         ORDER BY r.referred_at DESC, r.id ASC
       `
@@ -556,18 +563,24 @@ export async function listStardanceReferralsForUser(
           r.hours_approved::text AS hours_approved,
           r.verification_status,
           r.referred_at,
-          c.label AS referral_code_label
+          c.label AS referral_code_label,
+          p.id AS poster_id,
+          NULLIF(BTRIM(p.name), '') AS poster_name
         FROM stardance_referrals r
         JOIN stardance_referral_codes c ON c.id = r.referral_code_id
+        LEFT JOIN posters p ON p.user_id = r.user_id AND p.referral_code = c.code
         WHERE r.user_id = ${userId}
-          AND LOWER(c.label) LIKE ${pattern}
+          AND (
+            LOWER(c.label) LIKE ${pattern}
+            OR LOWER(NULLIF(BTRIM(p.name), '')) LIKE ${pattern}
+          )
         ORDER BY r.referred_at DESC, r.id ASC
       `;
 
   return rows
     .map((row) => ({
       id: row.id,
-      kind: "signup" as const,
+      kind: row.poster_id !== null ? "poster" as const : "signup" as const,
       name: row.name,
       slackId: row.slack_id,
       email: row.email,
@@ -577,8 +590,8 @@ export async function listStardanceReferralsForUser(
       referredAt: row.referred_at.toISOString(),
       referralCodeId: row.referral_code_id,
       referralCodeLabel: row.referral_code_label,
-      posterId: null,
-      posterName: null,
+      posterId: row.poster_id,
+      posterName: row.poster_name,
     }))
     .sort((a, b) => {
       const diff = new Date(b.referredAt).getTime() - new Date(a.referredAt).getTime();

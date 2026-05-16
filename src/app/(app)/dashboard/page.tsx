@@ -30,7 +30,7 @@ import {
 import { loadUserHackClubAddresses } from "@/lib/hca-addresses";
 import { readHcaAccessToken } from "@/lib/hca-access-token";
 import { canAccessPosters } from "@/lib/posters/access";
-import { getSafeguards } from "@/lib/safeguards";
+import { getEffectiveSafeguards } from "@/lib/safeguards";
 import { getSession } from "@/lib/session";
 import { canAccessShirts } from "@/lib/shirt/access";
 import { canAccessStardanceReferrals } from "@/lib/stardance-referrals";
@@ -111,7 +111,7 @@ export default async function DashboardPage({
     getTranslations(),
     getLocale(),
     searchParams,
-    getSafeguards(),
+    getEffectiveSafeguards(session.sub),
   ]);
 
   const [application, user, existingOrderRow] = await Promise.all([

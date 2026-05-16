@@ -20,6 +20,7 @@ import {
   listUserPosterGroups,
   listUserPosters,
   updatePosterMetadata,
+  updatePosterName,
   updatePosterProofAndVerification,
 } from "@/lib/posters/repository";
 import { findMatchingPoster, readQrCodesFromImageBuffer } from "@/lib/posters/qr";
@@ -69,8 +70,8 @@ function getPosterMetadataObject(poster: PosterRow): Record<string, unknown> {
 }
 
 function getPosterName(poster: PosterRow) {
-  const name = getPosterMetadataObject(poster).name;
-  return typeof name === "string" && name.trim() !== "" ? name : null;
+  const name = poster.name?.trim() ?? "";
+  return name === "" ? null : name;
 }
 
 function toClientPoster(poster: PosterRow, scanCount = 0) {
@@ -174,7 +175,7 @@ export async function createSinglePosterForUser(
     posterType,
     charset,
     posterGroupId: null,
-    metadata: name === null ? {} : { name },
+    name,
   });
 }
 
@@ -261,13 +262,7 @@ export async function renamePosterForUser(
 ) {
   const poster = await getPosterForUserOrThrow(userId, posterId);
   const normalized = normalizePosterName(name);
-  const metadata: Record<string, unknown> = { ...getPosterMetadataObject(poster) };
-  if (normalized === null) {
-    delete metadata.name;
-  } else {
-    metadata.name = normalized;
-  }
-  const updated = await updatePosterMetadata(poster.id, metadata);
+  const updated = await updatePosterName(poster.id, normalized);
   return { poster: toClientPoster(updated) };
 }
 

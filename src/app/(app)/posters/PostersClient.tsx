@@ -32,7 +32,7 @@ function toPosterStyle(size: PaperSize, color: ColorMode): PosterStyle {
 
 function formatPosterCode(code: string) {
   const normalized = code.trim().toUpperCase();
-  return /^[A-Z1-9]{5}$/.test(normalized) ? `a!${normalized}` : code;
+  return /^[A-Z1-9]{5}$/.test(normalized) ? `a${normalized}` : code;
 }
 
 function canDeletePoster(poster: ClientPoster) {
@@ -570,6 +570,69 @@ async function renamePosterRequest(posterId: string, name: string | null) {
   }
 }
 
+function PosterRenameControls({
+  inputRef,
+  draftName,
+  setDraftName,
+  busy,
+  displayCode,
+  onCommit,
+  onCancel,
+}: {
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  draftName: string;
+  setDraftName: (value: string) => void;
+  busy: boolean;
+  displayCode: string;
+  onCommit: () => void;
+  onCancel: () => void;
+}) {
+  const t = useTranslations("posters");
+
+  return (
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+      <Input
+        ref={inputRef}
+        type="text"
+        value={draftName}
+        onChange={(event) => setDraftName(event.currentTarget.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            onCommit();
+          } else if (event.key === "Escape") {
+            event.preventDefault();
+            onCancel();
+          }
+        }}
+        placeholder={t("actions.rename-placeholder")}
+        aria-label={t("actions.rename-poster", { code: displayCode })}
+        disabled={busy}
+        className="h-9 w-full max-w-sm"
+      />
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          size="app-sm"
+          onClick={onCommit}
+          disabled={busy}
+        >
+          {t("actions.rename-save")}
+        </Button>
+        <button
+          type="button"
+          data-slot="icon-link"
+          onClick={onCancel}
+          disabled={busy}
+          className="cursor-pointer bg-transparent px-2 py-1 text-sm text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {t("actions.rename-cancel")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function PosterTreeItem({
   poster,
   onRenamed,
@@ -623,6 +686,12 @@ function PosterTreeItem({
     }
   }
 
+  function cancelRename() {
+    setEditing(false);
+    setDraftName(poster.name ?? "");
+    setRowError(null);
+  }
+
   return (
     <li id={`poster-${poster.id}`} className="pl-4">
       <div className="flex flex-col gap-2 py-2 sm:flex-row sm:items-center sm:justify-between">
@@ -632,52 +701,15 @@ function PosterTreeItem({
             aria-hidden
           />
           {editing ? (
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <Input
-                ref={inputRef}
-                type="text"
-                value={draftName}
-                onChange={(event) => setDraftName(event.currentTarget.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    void commitRename();
-                  } else if (event.key === "Escape") {
-                    event.preventDefault();
-                    setEditing(false);
-                    setDraftName(poster.name ?? "");
-                    setRowError(null);
-                  }
-                }}
-                placeholder={t("actions.rename-placeholder")}
-                aria-label={t("actions.rename-poster", { code: displayCode })}
-                disabled={busy}
-                className="h-9 w-full max-w-sm"
-              />
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  size="app-sm"
-                  onClick={() => void commitRename()}
-                  disabled={busy}
-                >
-                  {t("actions.rename-save")}
-                </Button>
-                <button
-                  type="button"
-                  data-slot="icon-link"
-                  onClick={() => {
-                    setEditing(false);
-                    setDraftName(poster.name ?? "");
-                    setRowError(null);
-                  }}
-                  disabled={busy}
-                  className="bg-transparent px-2 py-1 text-sm text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {t("actions.rename-cancel")}
-                </button>
-              </div>
-            </div>
+            <PosterRenameControls
+              inputRef={inputRef}
+              draftName={draftName}
+              setDraftName={setDraftName}
+              busy={busy}
+              displayCode={displayCode}
+              onCommit={() => void commitRename()}
+              onCancel={cancelRename}
+            />
           ) : (
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
               <span className="truncate text-sm font-medium text-foreground">{title}</span>
@@ -717,7 +749,7 @@ function PosterTreeItem({
                 setEditing(true);
                 setRowError(null);
               }}
-              className="inline-flex size-7 items-center justify-center bg-transparent p-0 text-muted-foreground transition-colors hover:text-foreground"
+              className="inline-flex size-7 cursor-pointer items-center justify-center bg-transparent p-0 text-muted-foreground transition-colors hover:text-foreground"
               aria-label={t("actions.rename-poster", { code: displayCode })}
               title={t("actions.rename-poster", { code: displayCode })}
             >
@@ -795,56 +827,25 @@ function PosterRow({
     }
   }
 
+  function cancelRename() {
+    setEditing(false);
+    setDraftName(poster.name ?? "");
+    setRowError(null);
+  }
+
   return (
     <li id={`poster-${poster.id}`} className="flex items-center justify-between gap-3 px-4 py-3">
       <div className="min-w-0 flex-1">
         {editing ? (
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <Input
-              ref={inputRef}
-              type="text"
-              value={draftName}
-              onChange={(event) => setDraftName(event.currentTarget.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  void commitRename();
-                } else if (event.key === "Escape") {
-                  event.preventDefault();
-                  setEditing(false);
-                  setDraftName(poster.name ?? "");
-                  setRowError(null);
-                }
-              }}
-              placeholder={t("actions.rename-placeholder")}
-              aria-label={t("actions.rename-poster", { code: displayCode })}
-              disabled={busy}
-              className="h-9 w-full max-w-sm"
-            />
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                size="app-sm"
-                onClick={() => void commitRename()}
-                disabled={busy}
-              >
-                {t("actions.rename-save")}
-              </Button>
-              <button
-                type="button"
-                data-slot="icon-link"
-                onClick={() => {
-                  setEditing(false);
-                  setDraftName(poster.name ?? "");
-                  setRowError(null);
-                }}
-                disabled={busy}
-                className="bg-transparent px-2 py-1 text-sm text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {t("actions.rename-cancel")}
-              </button>
-            </div>
-          </div>
+          <PosterRenameControls
+            inputRef={inputRef}
+            draftName={draftName}
+            setDraftName={setDraftName}
+            busy={busy}
+            displayCode={displayCode}
+            onCommit={() => void commitRename()}
+            onCancel={cancelRename}
+          />
         ) : (
           <div className="flex min-w-0 flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-3">
             <span className="truncate text-sm font-medium text-foreground">{title}</span>
@@ -884,7 +885,7 @@ function PosterRow({
               setEditing(true);
               setRowError(null);
             }}
-            className="inline-flex items-center gap-1.5 bg-transparent p-0 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            className="inline-flex cursor-pointer items-center gap-1.5 bg-transparent p-0 text-sm text-muted-foreground transition-colors hover:text-foreground"
             aria-label={t("actions.rename-poster", { code: displayCode })}
             title={t("actions.rename-poster", { code: displayCode })}
           >
