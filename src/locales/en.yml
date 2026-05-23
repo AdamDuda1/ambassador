@@ -188,7 +188,9 @@ posters:
     refresh-location: Refresh location
     delete: Delete
     delete-poster: "Delete poster {code}"
-    delete-disabled: Until referrals start syncing, we will not be allowing any poster deletions
+    delete-group: "Delete group {name}"
+    delete-poster-confirm: "Are you sure you want to delete poster {code}?"
+    delete-group-confirm: "Are you sure you want to delete group {name}?"
     rename: Rename
     rename-poster: "Rename poster {code}"
     rename-group: "Rename group {name}"
@@ -248,6 +250,8 @@ posters:
     geolocation-denied: Precise location access was denied. Please enable it in your browser settings.
     rename-failed: Could not rename poster.
     rename-group-failed: Could not rename group.
+    delete-failed: Could not delete poster.
+    delete-group-failed: Could not delete group.
     move-failed: Could not move poster.
 
 referrals:

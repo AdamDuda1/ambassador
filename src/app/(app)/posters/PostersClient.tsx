@@ -586,6 +586,15 @@ async function renamePosterGroupRequest(groupId: string, name: string | null) {
   }
 }
 
+async function deletePosterGroupRequest(groupId: string) {
+  const response = await fetch(`/api/poster-groups/${groupId}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+}
+
 function GroupCard({
   group,
   busy,
@@ -602,6 +611,7 @@ function GroupCard({
   const [editingName, setEditingName] = useState(false);
   const [draftName, setDraftName] = useState(group.name ?? "");
   const [renameBusy, setRenameBusy] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const [renameError, setRenameError] = useState<string | null>(null);
   const nameInputRef = useRef<HTMLInputElement | null>(null);
   const pendingCount = group.posters.filter((p) => p.verification_status === "pending").length;
@@ -651,6 +661,22 @@ function GroupCard({
     setEditingName(false);
     setDraftName(group.name ?? "");
     setRenameError(null);
+  }
+
+  async function deleteGroup() {
+    if (!window.confirm(t("actions.delete-group-confirm", { name: displayName }))) {
+      return;
+    }
+    setDeleteBusy(true);
+    setRenameError(null);
+    try {
+      await deletePosterGroupRequest(group.id);
+      onRefresh();
+    } catch {
+      setRenameError(t("errors.delete-group-failed"));
+    } finally {
+      setDeleteBusy(false);
+    }
   }
 
   return (
@@ -727,19 +753,18 @@ function GroupCard({
             {t("actions.rename")}
           </button>
           {canDeleteGroup ? (
-            <HoverHint message={t("actions.delete-disabled")}>
-              <button
-                type="button"
-                data-slot="icon-link"
-                onClick={(event) => event.preventDefault()}
-                aria-disabled
-                aria-label={t("actions.delete-disabled")}
-                className="inline-flex shrink-0 cursor-not-allowed items-center gap-1.5 bg-transparent p-0 text-sm text-muted-foreground opacity-50 transition-colors"
-              >
-                <Trash2 size={16} />
-                {t("actions.delete")}
-              </button>
-            </HoverHint>
+            <button
+              type="button"
+              data-slot="icon-link"
+              onClick={() => void deleteGroup()}
+              disabled={deleteBusy}
+              aria-label={t("actions.delete-group", { name: displayName })}
+              title={t("actions.delete-group", { name: displayName })}
+              className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 bg-transparent p-0 text-sm text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Trash2 size={16} />
+              {t("actions.delete")}
+            </button>
           ) : null}
         </div>
         )}
@@ -834,38 +859,11 @@ function UngroupedCard({
           <PosterRow
             key={poster.id}
             poster={poster}
-            onRenamed={onRefresh}
+            onRefresh={onRefresh}
           />
         ))}
       </ul>
     </div>
-  );
-}
-
-function HoverHint({
-  message,
-  children,
-}: {
-  message: string;
-  children: React.ReactNode;
-}) {
-  const [show, setShow] = useState(false);
-  return (
-    <span
-      className="relative inline-flex cursor-help"
-      onMouseEnter={() => setShow(true)}
-      onMouseLeave={() => setShow(false)}
-    >
-      {children}
-      {show && (
-        <span
-          className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 w-56 -translate-x-1/2 !rounded-none px-3 py-2 font-body text-xs"
-          style={{ backgroundColor: "#000", color: "#fff" }}
-        >
-          {message}
-        </span>
-      )}
-    </span>
   );
 }
 
@@ -874,6 +872,15 @@ async function renamePosterRequest(posterId: string, name: string | null) {
     method: "PATCH",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ name }),
+  });
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+}
+
+async function deletePosterRequest(posterId: string) {
+  const response = await fetch(`/api/posters/${posterId}`, {
+    method: "DELETE",
   });
   if (!response.ok) {
     throw new Error(await response.text());
@@ -1091,6 +1098,22 @@ function PosterTreeItem({
     setRowError(null);
   }
 
+  async function deletePoster() {
+    if (!window.confirm(t("actions.delete-poster-confirm", { code: displayCode }))) {
+      return;
+    }
+    setBusy(true);
+    setRowError(null);
+    try {
+      await deletePosterRequest(poster.id);
+      onRefresh();
+    } catch {
+      setRowError(t("errors.delete-failed"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <li
       id={`poster-${poster.id}`}
@@ -1174,18 +1197,17 @@ function PosterTreeItem({
               <Pencil size={16} />
             </button>
             {canDeletePoster(poster) ? (
-              <HoverHint message={t("actions.delete-disabled")}>
-                <button
-                  type="button"
-                  data-slot="icon-link"
-                  onClick={(event) => event.preventDefault()}
-                  aria-disabled
-                  className="inline-flex size-7 cursor-not-allowed items-center justify-center bg-transparent p-0 text-muted-foreground opacity-50 transition-colors"
-                  aria-label={t("actions.delete-disabled")}
-                >
-                  <Trash2 size={17} strokeWidth={2} />
-                </button>
-              </HoverHint>
+              <button
+                type="button"
+                data-slot="icon-link"
+                onClick={() => void deletePoster()}
+                disabled={busy}
+                className="inline-flex size-7 cursor-pointer items-center justify-center bg-transparent p-0 text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                aria-label={t("actions.delete-poster", { code: displayCode })}
+                title={t("actions.delete-poster", { code: displayCode })}
+              >
+                <Trash2 size={17} strokeWidth={2} />
+              </button>
             ) : null}
           </div>
         )}
@@ -1196,10 +1218,10 @@ function PosterTreeItem({
 
 function PosterRow({
   poster,
-  onRenamed,
+  onRefresh,
 }: {
   poster: ClientPoster;
-  onRenamed: () => void;
+  onRefresh: () => void;
 }) {
   const t = useTranslations("posters");
   const [editing, setEditing] = useState(false);
@@ -1238,7 +1260,7 @@ function PosterRow({
     try {
       await renamePosterRequest(poster.id, next === "" ? null : next);
       setEditing(false);
-      onRenamed();
+      onRefresh();
     } catch {
       setRowError(t("errors.rename-failed"));
     } finally {
@@ -1250,6 +1272,22 @@ function PosterRow({
     setEditing(false);
     setDraftName(poster.name ?? "");
     setRowError(null);
+  }
+
+  async function deletePoster() {
+    if (!window.confirm(t("actions.delete-poster-confirm", { code: displayCode }))) {
+      return;
+    }
+    setBusy(true);
+    setRowError(null);
+    try {
+      await deletePosterRequest(poster.id);
+      onRefresh();
+    } catch {
+      setRowError(t("errors.delete-failed"));
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -1331,19 +1369,18 @@ function PosterRow({
             {t("actions.rename")}
           </button>
           {canDeletePoster(poster) ? (
-            <HoverHint message={t("actions.delete-disabled")}>
-              <button
-                type="button"
-                data-slot="icon-link"
-                onClick={(event) => event.preventDefault()}
-                aria-disabled
-                aria-label={t("actions.delete-disabled")}
-                className="inline-flex cursor-not-allowed items-center gap-1.5 bg-transparent p-0 text-sm text-muted-foreground opacity-50 transition-colors"
-              >
-                <Trash2 size={16} />
-                {t("actions.delete")}
-              </button>
-            </HoverHint>
+            <button
+              type="button"
+              data-slot="icon-link"
+              onClick={() => void deletePoster()}
+              disabled={busy}
+              aria-label={t("actions.delete-poster", { code: displayCode })}
+              title={t("actions.delete-poster", { code: displayCode })}
+              className="inline-flex cursor-pointer items-center gap-1.5 bg-transparent p-0 text-sm text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Trash2 size={16} />
+              {t("actions.delete")}
+            </button>
           ) : null}
         </div>
       )}
