@@ -49,6 +49,7 @@ export type ShopOrderRow = {
   internal_fail_reason: string | null;
   reviewed_at: string | null;
   reviewed_by: string | null;
+  dispatch_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -67,4 +68,23 @@ export function canPlaceAnotherShirtOrder(status: string | null | undefined) {
     status === ORDER_STATUS_FAILED ||
     status === ORDER_STATUS_CANCELLED
   );
+}
+
+export const SHIRT_ORDER_EMBARGO_HOURS = 24;
+export const SHIRT_ORDER_EMBARGO_MS = SHIRT_ORDER_EMBARGO_HOURS * 60 * 60 * 1000;
+
+export function computeShirtOrderDispatchAt(now: Date = new Date()) {
+  return new Date(now.getTime() + SHIRT_ORDER_EMBARGO_MS);
+}
+
+export function isOrderWithinEmbargo(
+  status: string | null | undefined,
+  dispatchAt: string | Date | null | undefined,
+  now: Date = new Date(),
+) {
+  if (status !== ORDER_STATUS_PENDING) return false;
+  if (dispatchAt === null || dispatchAt === undefined) return false;
+  const at = dispatchAt instanceof Date ? dispatchAt : new Date(dispatchAt);
+  if (Number.isNaN(at.getTime())) return false;
+  return now.getTime() < at.getTime();
 }

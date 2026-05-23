@@ -35,6 +35,7 @@ export type ShirtOrderState = {
   warehouseUrl: string | null;
   publicOrderUrl: string | null;
   note: string | null;
+  dispatchAt: string | null;
 };
 
 export type ShirtOrderSectionProps = {
@@ -152,7 +153,7 @@ function ShirtOrderBody({
   const [submitting, setSubmitting] = useState(false);
   const [refreshingAddresses, setRefreshingAddresses] = useState(false);
   const [error, setError] = useState("");
-  const [order, setOrder] = useState<ShirtOrderState | null>(existingOrder);
+  const order = existingOrder;
   const canPlaceOrder = !order || canPlaceAnotherShirtOrder(order.status);
   const hasLiveStock = SHIRT_SIZES.some((shirtSize) => stockBySize[shirtSize] !== null);
   const availableSizes = SHIRT_SIZES.filter((shirtSize) => {
@@ -234,19 +235,8 @@ function ShirtOrderBody({
         body: JSON.stringify({ size, addressIndex }),
       });
       if (res.ok) {
-        const data = await res.json().catch(() => null);
-        const payload: Record<string, unknown> | null =
-          typeof data === "object" && data !== null && !Array.isArray(data)
-            ? Object.fromEntries(Object.entries(data))
-            : null;
-        setOrder({
-          id: typeof payload?.id === "string" ? payload.id : "",
-          status: ORDER_STATUS_PENDING,
-          size,
-          warehouseUrl: null,
-          publicOrderUrl: null,
-          note: null,
-        });
+        window.location.reload();
+        return;
       } else {
         const data = await res.json().catch(() => null);
         const payload: Record<string, unknown> | null =
@@ -280,7 +270,7 @@ function ShirtOrderBody({
 
   if (order && !canPlaceOrder) {
     return (
-      <div className="mt-5">
+      <div className="mt-2">
         <LatestOrderCard order={order} />
       </div>
     );
@@ -531,6 +521,8 @@ function useAddressReturnRefresh(enabled: boolean) {
 function LatestOrderCard({ order }: { order: ShirtOrderState }) {
   const t = useTranslations("shirt");
   const approvedTrackingUrl = order.publicOrderUrl ?? order.warehouseUrl;
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState("");
 
   if (order.status === ORDER_STATUS_APPROVED) {
     return (
@@ -557,22 +549,59 @@ function LatestOrderCard({ order }: { order: ShirtOrderState }) {
     );
   }
 
+  if (order.status === ORDER_STATUS_PENDING) {
+    return (
+      <PendingOrderCard
+        order={order}
+        cancelling={cancelling}
+        cancelError={cancelError}
+        onCancel={async () => {
+          if (cancelling) return;
+          if (!window.confirm(t("order.cancel-confirm"))) return;
+          setCancelling(true);
+          setCancelError("");
+          try {
+            const res = await fetch(`/api/shirt/orders/${order.id}/cancel`, {
+              method: "POST",
+            });
+            if (res.ok) {
+              window.location.reload();
+              return;
+            }
+            const data = await res.json().catch(() => null);
+            const payload: Record<string, unknown> | null =
+              typeof data === "object" && data !== null && !Array.isArray(data)
+                ? Object.fromEntries(Object.entries(data))
+                : null;
+            setCancelError(
+              payload?.error === "embargo_expired"
+                ? t("order.cancel-too-late")
+                : payload?.error === "not_cancellable"
+                  ? t("order.cancel-not-cancellable")
+                  : t("errors.generic"),
+            );
+          } catch {
+            setCancelError(t("errors.generic"));
+          } finally {
+            setCancelling(false);
+          }
+        }}
+      />
+    );
+  }
+
   const title =
     order.status === ORDER_STATUS_REJECTED
         ? t("order.rejected-title")
         : order.status === ORDER_STATUS_FAILED
           ? t("order.failed-title")
-          : order.status === ORDER_STATUS_CANCELLED
-            ? t("order.cancelled-title")
-            : t("order.pending-title");
+          : t("order.cancelled-title");
   const body =
     order.status === ORDER_STATUS_REJECTED
         ? t("order.rejected-body")
         : order.status === ORDER_STATUS_FAILED
           ? t("order.failed-body")
-          : order.status === ORDER_STATUS_CANCELLED
-            ? t("order.cancelled-body")
-            : t("order.pending-body", { size: order.size ?? "" });
+          : t("order.cancelled-body");
 
   return (
     <div>
@@ -612,6 +641,64 @@ function LatestOrderCard({ order }: { order: ShirtOrderState }) {
       ) : null}
     </div>
   );
+}
+
+function PendingOrderCard({
+  order,
+  cancelling,
+  cancelError,
+  onCancel,
+}: {
+  order: ShirtOrderState;
+  cancelling: boolean;
+  cancelError: string;
+  onCancel: () => void | Promise<void>;
+}) {
+  const t = useTranslations("shirt");
+  const dispatchAt = order.dispatchAt;
+  const now = useNow(1000);
+  const dispatchDate = dispatchAt !== null ? new Date(dispatchAt) : null;
+  const dispatchValid = dispatchDate !== null && !Number.isNaN(dispatchDate.getTime());
+  const remainingMs = dispatchValid ? dispatchDate!.getTime() - now : 0;
+  const withinEmbargo = !dispatchValid || remainingMs > 0;
+
+  return (
+    <div>
+      {withinEmbargo ? (
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <p className="font-body text-base leading-relaxed text-muted-foreground md:text-lg">
+            {t("order.pending-hint")}
+          </p>
+          <button
+            type="button"
+            data-slot="text-link"
+            onClick={onCancel}
+            disabled={cancelling}
+            className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 appearance-none border-0 bg-transparent p-0 font-body text-sm text-primary underline underline-offset-2 hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Icon glyph="forbidden" size={16} />
+            {cancelling ? t("order.cancel-pending") : t("order.cancel-cta")}
+          </button>
+        </div>
+      ) : (
+        <p className="font-body text-base leading-relaxed text-white md:text-lg">
+          {t("order.pending-dispatching")}
+        </p>
+      )}
+      {cancelError !== "" ? (
+        <p className="mt-2 font-body text-sm text-primary">{cancelError}</p>
+      ) : null}
+    </div>
+  );
+}
+
+function useNow(intervalMs: number) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), intervalMs);
+    return () => window.clearInterval(id);
+  }, [intervalMs]);
+  return now;
 }
 
 function RefreshAddressButton({

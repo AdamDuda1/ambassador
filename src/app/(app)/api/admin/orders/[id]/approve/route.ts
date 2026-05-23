@@ -1,41 +1,16 @@
 import { revalidatePath } from "next/cache";
 
-import { clearCachedWarehouseStats } from "@/lib/admin/warehouse-stats-cache";
-import {
-  isUserAdmin,
-  setLatestApplicationTshirtSentForUser,
-} from "@/lib/applications/review";
+import { isUserAdmin } from "@/lib/applications/review";
 import sql from "@/lib/database/client";
 import { ensureSchema } from "@/lib/database/ensure-schema";
 import { getSafeRedirectUrl, isSameOriginRequest } from "@/lib/http";
 import { getActorSession } from "@/lib/session";
-import {
-  ORDER_STATUS_APPROVED,
-  ORDER_STATUS_CANCELLED,
-  ORDER_STATUS_FAILED,
-  ORDER_STATUS_PENDING,
-  ORDER_STATUS_REJECTED,
-  SHIRT_SKU_PREFIX,
-} from "@/lib/shop";
-import {
-  type HackClubAuthAddress,
-  parseWarehouseOrderResponse,
-  WarehouseApiClient,
-  WarehouseApiError,
-} from "@/lib/warehouse";
+import { dispatchShirtOrder } from "@/lib/shirt/dispatch";
 
-type OrderApproveRow = {
+type OrderRow = {
   id: string;
   user_id: string;
   status: string;
-  sku: string | null;
-  variant: string | null;
-  address: HackClubAuthAddress | null;
-  warehouse_order_id: string | null;
-  warehouse_status: string | null;
-  warehouse_payload: unknown | null;
-  email: string;
-  display_name: string;
 };
 
 type OrderIdRow = {
@@ -63,14 +38,8 @@ export async function POST(
   const { id } = await params;
   const formData = await request.formData();
 
-  const order = (await sql<OrderApproveRow[]>`
-    SELECT o.id, o.user_id, o.status, o.sku, o.variant, o.address, o.warehouse_order_id,
-           o.warehouse_status, o.warehouse_payload,
-           u.email, u.display_name
-    FROM orders o
-    JOIN users u ON u.id = o.user_id
-    WHERE o.id = ${id}
-    LIMIT 1
+  const order = (await sql<OrderRow[]>`
+    SELECT id, user_id, status FROM orders WHERE id = ${id} LIMIT 1
   `).at(0) ?? null;
   if (order === null) {
     return Response.json({ error: "not_found" }, { status: 404 });
@@ -87,105 +56,20 @@ export async function POST(
   if (latestOrder?.id !== order.id) {
     return Response.json({ error: "historical_order" }, { status: 409 });
   }
-  if (
-    order.status !== ORDER_STATUS_PENDING &&
-    order.status !== ORDER_STATUS_REJECTED &&
-    order.status !== ORDER_STATUS_FAILED &&
-    order.status !== ORDER_STATUS_CANCELLED &&
-    order.status !== ORDER_STATUS_APPROVED
-  ) {
-    return Response.json({ error: "invalid_order_status" }, { status: 409 });
-  }
-  if (order.sku === null || order.sku === "" || order.address === null) {
-    return Response.json({ error: "invalid_order" }, { status: 400 });
-  }
 
-  const existingWarehouseOrder = parseWarehouseOrderResponse(order.warehouse_payload);
-  const existingWarehouseOrderId =
-    order.warehouse_order_id ?? existingWarehouseOrder?.id ?? null;
-  const existingWarehouseStatus =
-    order.warehouse_status ?? existingWarehouseOrder?.status ?? null;
+  const result = await dispatchShirtOrder({ orderId: id, reviewerUserId: session.sub });
 
-  try {
-    if (existingWarehouseOrderId !== null && existingWarehouseOrderId !== "") {
-      await sql`
-        UPDATE orders
-        SET status = ${ORDER_STATUS_APPROVED},
-            warehouse_order_id = ${existingWarehouseOrderId},
-            warehouse_status = ${existingWarehouseStatus},
-            note = NULL,
-            internal_fail_reason = NULL,
-            reviewed_at = NOW(),
-            reviewed_by = ${session.sub},
-            updated_at = NOW()
-        WHERE id = ${id}
-      `;
-    } else {
-      const result = await new WarehouseApiClient().createOrder({
-        sku: order.sku,
-        quantity: 1,
-        name: order.display_name,
-        email: order.email,
-        orderNumber: order.id,
-        address: order.address,
-        userFacingTitle: `Hack Club Ambassador shirt (${order.variant ?? ""})`.trim(),
-        tags: ["Ambassadors"],
-        metadata: {
-          ambassador_order_id: order.id,
-          ambassador_user_id: order.user_id,
-        },
-      });
-
-      await sql`
-        UPDATE orders
-        SET status = ${ORDER_STATUS_APPROVED},
-            warehouse_order_id = ${result.id},
-            warehouse_status = ${result.status},
-            warehouse_payload = CAST(${JSON.stringify(result)} AS JSONB),
-            note = NULL,
-            internal_fail_reason = NULL,
-            reviewed_at = NOW(),
-            reviewed_by = ${session.sub},
-            updated_at = NOW()
-        WHERE id = ${id}
-      `;
-    }
-  } catch (error) {
-    const message =
-      error instanceof WarehouseApiError
-        ? `Warehouse ${error.status}: ${typeof error.body === "string" ? error.body : JSON.stringify(error.body)}`
-        : error instanceof Error
-          ? error.message
-          : "unknown error";
-
-    await sql`
-      UPDATE orders
-      SET internal_fail_reason = ${message},
-          updated_at = NOW()
-      WHERE id = ${id}
-    `;
-
-    revalidatePath(`/admin/orders/${id}`);
-    revalidatePath("/admin/orders");
-    revalidatePath(`/admin/users/${order.user_id}`);
-    revalidatePath("/dashboard");
-
-    return Response.redirect(getSafeRedirectUrl(request, formData.get("redirectTo"), `/admin/orders`));
-  }
-
-  if (order.sku.startsWith(SHIRT_SKU_PREFIX)) {
-    try {
-      await setLatestApplicationTshirtSentForUser(order.user_id, true);
-    } catch (error) {
-      console.error(`[orders] unable to sync tshirt-sent for order ${order.id}`, error);
-    }
-  }
-
-  clearCachedWarehouseStats();
   revalidatePath(`/admin/orders/${id}`);
   revalidatePath("/admin/orders");
   revalidatePath(`/admin/users/${order.user_id}`);
   revalidatePath("/dashboard");
+
+  if (result.kind === "not_pending") {
+    return Response.json({ error: "invalid_order_status" }, { status: 409 });
+  }
+  if (result.kind === "invalid_order") {
+    return Response.json({ error: "invalid_order" }, { status: 400 });
+  }
 
   return Response.redirect(getSafeRedirectUrl(request, formData.get("redirectTo"), `/admin/orders`));
 }

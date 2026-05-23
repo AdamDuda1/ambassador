@@ -343,11 +343,8 @@ shirt:
     place: Place order
     placing: Placing order...
   order:
-    pending-title: Pending for 24h
-    pending-body: "Your size {size} shirt is locked in. It auto-ships to the warehouse after a 24-hour hold so you have time to change your mind."
-    pending-countdown: "Ships to the warehouse in {countdown}. You can cancel any time before then."
-    pending-dispatching: Hold's up — your order is being sent to the warehouse now.
-    pending-warning: "Once the 24-hour hold ends, the order is sent to the warehouse and cannot be cancelled. No exceptions."
+    pending-dispatching: Sending to the warehouse now…
+    pending-hint: Your order is pending. You may cancel it in this state, but you CANNOT cancel it once it is sent to the warehouse.
     cancel-cta: Cancel this order
     cancel-pending: Cancelling...
     cancel-confirm: "Cancel this shirt order? You can place a new one right after."
