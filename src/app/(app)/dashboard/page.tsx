@@ -73,6 +73,7 @@ type ShirtOrderRow = {
   warehouse_order_id: string | null;
   warehouse_payload: unknown | null;
   note: string | null;
+  dispatch_at: string | null;
 };
 
 type ApplicationRow = {
@@ -127,7 +128,7 @@ export default async function DashboardPage({
       FROM users WHERE id = ${session.sub}
     `.then((rows) => rows.at(0) ?? null),
     sql<ShirtOrderRow[]>`
-      SELECT id, status, variant, warehouse_order_id, warehouse_payload, note
+      SELECT id, status, variant, warehouse_order_id, warehouse_payload, note, dispatch_at
       FROM orders
       WHERE user_id = ${session.sub} AND sku LIKE ${`${SHIRT_SKU_PREFIX}%`}
       ORDER BY created_at DESC, id DESC
@@ -198,6 +199,7 @@ export default async function DashboardPage({
         warehouseUrl: warehouseOrderId === null ? null : buildWarehouseTrackingUrl(warehouseOrderId),
         publicOrderUrl: warehouseOrderId === null ? null : buildWarehousePublicOrderUrl(warehouseOrderId),
         note: existingOrderRow.note,
+        dispatchAt: existingOrderRow.dispatch_at,
       }
     : null;
   const shirt: ShirtOrderSectionProps = {

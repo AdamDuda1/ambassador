@@ -11,6 +11,7 @@ import { getSession } from "@/lib/session";
 import { canAccessShirts } from "@/lib/shirt/access";
 import {
   canPlaceAnotherShirtOrder,
+  computeShirtOrderDispatchAt,
   isShirtSize,
   ORDER_STATUS_PENDING,
   SHIRT_SKU_PREFIX,
@@ -150,6 +151,7 @@ export async function POST(request: Request) {
 
   const details = JSON.stringify({ type: "ambassador-shirt" });
   const serializedAddress = JSON.stringify(address);
+  const dispatchAt = computeShirtOrderDispatchAt();
 
   const created = await sql.begin(async (transaction) => {
     const lockedUser = (await transaction<Pick<ShirtOrderUserRow, "id">[]>`
@@ -192,7 +194,7 @@ export async function POST(request: Request) {
     }
 
     await transaction`
-      INSERT INTO orders (id, user_id, status, sku, variant, quantity, address, details)
+      INSERT INTO orders (id, user_id, status, sku, variant, quantity, address, details, dispatch_at)
       VALUES (
         ${id},
         ${session.sub},
@@ -201,7 +203,8 @@ export async function POST(request: Request) {
         ${size},
         1,
         CAST(${serializedAddress} AS JSONB),
-        CAST(${details} AS JSONB)
+        CAST(${details} AS JSONB),
+        ${dispatchAt}
       )
     `;
 
@@ -214,5 +217,5 @@ export async function POST(request: Request) {
 
   clearCachedWarehouseStats();
 
-  return Response.json({ ok: true, id });
+  return Response.json({ ok: true, id, dispatchAt: dispatchAt.toISOString() });
 }

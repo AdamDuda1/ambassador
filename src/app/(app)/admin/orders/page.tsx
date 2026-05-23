@@ -33,6 +33,7 @@ type OrderRow = {
   address: HackClubAddress | null;
   note: string | null;
   created_at: string;
+  dispatch_at: string | null;
   user_name: string | null;
   user_email: string | null;
   user_slack_id: string | null;
@@ -81,7 +82,7 @@ export default async function AdminOrdersPage({
 
   const [orders, countResult, hcbConnection, stockBySize] = await Promise.all([
     sql<OrderRow[]>`
-      SELECT o.id, o.status, o.sku, o.variant, o.address, o.note, o.created_at,
+      SELECT o.id, o.status, o.sku, o.variant, o.address, o.note, o.created_at, o.dispatch_at,
              u.display_name AS user_name, u.email AS user_email,
              u.slack_id AS user_slack_id, u.slack_name AS user_slack_name
       FROM orders o
@@ -251,7 +252,9 @@ export default async function AdminOrdersPage({
                             : "black",
                     })}
                   >
-                    {order.status}
+                    {order.status === ORDER_STATUS_PENDING
+                      ? t("admin.orders.status-display.pending")
+                      : order.status}
                   </span>
                   {order.note !== null && order.note.trim() !== "" ? (
                     <p className="mt-2 max-w-xs font-body text-sm text-primary">
