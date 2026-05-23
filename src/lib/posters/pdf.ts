@@ -56,29 +56,6 @@ function drawVectorQrCode(
   }
 }
 
-async function createFallbackPosterPdf(content: string) {
-  const pdf = await PDFDocument.create();
-  const page = pdf.addPage([595.28, 841.89]);
-  const qr = await pdf.embedPng(await generateQrCodePng(content, 200));
-  const font = await pdf.embedFont(StandardFonts.HelveticaBold);
-
-  page.drawImage(qr, {
-    x: (page.getWidth() - 220) / 2,
-    y: page.getHeight() / 2 - 30,
-    width: 220,
-    height: 220,
-  });
-  page.drawText("Scan to continue", {
-    x: 200,
-    y: page.getHeight() / 2 - 65,
-    size: 16,
-    font,
-    color: rgb(0, 0, 0),
-  });
-
-  return Buffer.from(await pdf.save());
-}
-
 export async function generatePosterPdf(options: {
   campaignSlug: string;
   style: PosterStyle;
@@ -88,7 +65,7 @@ export async function generatePosterPdf(options: {
   const templatePath = resolvePosterTemplatePath(options.campaignSlug, options.style);
 
   if (templatePath === null) {
-    return createFallbackPosterPdf(options.content);
+    throw new Error(`Poster template not found for ${options.campaignSlug}/${options.style}.`);
   }
 
   const source = await fs.readFile(templatePath);

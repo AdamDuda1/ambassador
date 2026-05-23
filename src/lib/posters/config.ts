@@ -54,6 +54,20 @@ function regionalTemplateFilename(base: PosterStyleBase, region: string) {
   return `regionals/stardance-${REGIONAL_PAPER[base]}-${REGIONAL_COLOR[base]}-${region}.pdf`;
 }
 
+function posterTemplateFilename(
+  config: PosterCampaignConfigFile,
+  style: PosterStyle,
+  base: PosterStyleBase,
+  region: string | null,
+) {
+  return (
+    config.templates?.[style] ??
+    (region !== null
+      ? regionalTemplateFilename(base, region)
+      : config.templates?.[base] ?? defaultTemplateFilenames[base])
+  );
+}
+
 function posterTemplateRoots() {
   return [
     optionalEnv("POSTER_TEMPLATE_ROOT"),
@@ -133,11 +147,7 @@ export function resolvePosterTemplatePath(campaignSlug: string, style: PosterSty
   if (parsed === null) return null;
   const { base, region } = parsed;
 
-  const filename =
-    config.templates?.[style] ??
-    (region !== null
-      ? regionalTemplateFilename(base, region)
-      : defaultTemplateFilenames[base]);
+  const filename = posterTemplateFilename(config, style, base, region);
 
   for (const root of posterTemplateRoots()) {
     const campaignTemplate = path.join(root, slug, filename);
@@ -145,13 +155,17 @@ export function resolvePosterTemplatePath(campaignSlug: string, style: PosterSty
       return campaignTemplate;
     }
 
-    const defaultTemplate = path.join(root, DEFAULT_POSTER_CAMPAIGN, defaultTemplateFilenames[base]);
+    const defaultTemplate = path.join(root, DEFAULT_POSTER_CAMPAIGN, filename);
     if (fs.existsSync(defaultTemplate)) {
       return defaultTemplate;
     }
   }
 
   return null;
+}
+
+export function isPosterStyleAvailable(campaignSlug: string, style: PosterStyle) {
+  return resolvePosterTemplatePath(campaignSlug, style) !== null;
 }
 
 export function getPosterRenderConfig(
@@ -319,11 +333,7 @@ export function listPosterCampaigns(): PosterCampaignSummary[] {
         styles.flatMap((style) => {
           const parsed = parsePosterStyle(style);
           if (parsed === null) return [];
-          const filename =
-            config.templates?.[style] ??
-            (parsed.region !== null
-              ? regionalTemplateFilename(parsed.base, parsed.region)
-              : defaultTemplateFilenames[parsed.base]);
+          const filename = posterTemplateFilename(config, style, parsed.base, parsed.region);
           const preview = previewFilename(filename);
           if (!fs.existsSync(path.join(publicPosterRoot, slug, preview))) return [];
           return [[style, encodeStylePath(slug, preview)]];

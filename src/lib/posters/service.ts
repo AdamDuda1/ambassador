@@ -2,6 +2,7 @@ import {
   buildPosterRedirectUrl,
   buildPosterScanUrl,
   formatPosterReferralCode,
+  isPosterStyleAvailable,
   normalizeCampaignSlug,
 } from "@/lib/posters/config";
 import { generateMergedPosterGroupPdf, generatePosterPdf } from "@/lib/posters/pdf";
@@ -48,6 +49,14 @@ const MAX_POSTER_NAME_LENGTH = 80;
 
 function isPosterStyle(value: string | null | undefined): value is PosterStyle {
   return typeof value === "string" && parsePosterStyle(value) !== null;
+}
+
+function requireAvailablePosterStyle(campaignSlug: string, value: string | null | undefined) {
+  const posterType = isPosterStyle(value) ? value : "color";
+  if (!isPosterStyleAvailable(campaignSlug, posterType)) {
+    throw new PosterRequestError("That poster style is not available for this campaign.", 400);
+  }
+  return posterType;
 }
 
 function isPosterGroupCharset(value: string | null | undefined): value is PosterGroupCharset {
@@ -181,7 +190,7 @@ export async function createSinglePosterForUser(
   },
 ) {
   const campaignSlug = normalizeCampaignSlug(input.campaignSlug);
-  const posterType = isPosterStyle(input.posterType) ? input.posterType : "color";
+  const posterType = requireAvailablePosterStyle(campaignSlug, input.posterType);
   const charset = isPosterGroupCharset(input.charset) ? input.charset : "alphanumeric";
   const name = normalizePosterName(input.name);
   const existingCount = await countUserPosters(input.userId);
@@ -223,7 +232,7 @@ export async function createPosterGroupForUser(
   }
   const count = Math.min(Math.max(input.count, 0), MAX_POSTERS_PER_GROUP, Math.max(remaining, 0));
   const campaignSlug = normalizeCampaignSlug(input.campaignSlug);
-  const posterType = isPosterStyle(input.posterType) ? input.posterType : "color";
+  const posterType = requireAvailablePosterStyle(campaignSlug, input.posterType);
   const charset = isPosterGroupCharset(input.charset) ? input.charset : "alphanumeric";
   const name = requirePosterName(input.name, "Poster group name");
 

@@ -43,6 +43,14 @@ function toPosterStyleBase(size: PaperSize, color: ColorMode): PosterStyleBase {
   return "color";
 }
 
+function paperSizeForBase(base: PosterStyleBase): PaperSize {
+  return base === "a4" || base === "a4_bw" ? "a4" : "letter";
+}
+
+function colorModeForBase(base: PosterStyleBase): ColorMode {
+  return base === "bw" || base === "a4_bw" || base === "printer_efficient" ? "bw" : "color";
+}
+
 function toPosterStyle(
   size: PaperSize,
   color: ColorMode,
@@ -247,6 +255,7 @@ export function PostersClient({
     [campaigns, campaignSlug],
   );
   const availableStyles = campaign?.styles ?? POSTER_STYLES;
+  const availableStyleSet = useMemo(() => new Set<PosterStyle>(availableStyles), [availableStyles]);
   const campaignRegions = useMemo(() => campaign?.regions ?? [], [campaign]);
 
   const parsedStyles = useMemo(
@@ -261,16 +270,20 @@ export function PostersClient({
   const availableSizes = useMemo<PaperSize[]>(() => {
     const sizes = new Set<PaperSize>();
     for (const { base } of parsedStyles) {
-      if (base === "color" || base === "bw") sizes.add("letter");
-      if (base === "a4" || base === "a4_bw") sizes.add("a4");
+      sizes.add(paperSizeForBase(base));
     }
     return [...sizes];
   }, [parsedStyles]);
 
+  const selectedPaperSize = availableSizes.includes(paperSize)
+    ? paperSize
+    : availableSizes[0] ?? "letter";
+
   const availableVariants = useMemo<VariantOption[]>(() => {
     const present = new Set<string>();
     for (const { base, region } of parsedStyles) {
-      const variantColor: ColorMode = base === "bw" || base === "a4_bw" ? "bw" : "color";
+      if (paperSizeForBase(base) !== selectedPaperSize) continue;
+      const variantColor = colorModeForBase(base);
       present.add(`${variantColor}|${region ?? ""}`);
     }
     const englishOptions: VariantOption[] = [];
@@ -301,10 +314,11 @@ export function PostersClient({
       }
     }
     return [...englishOptions, ...regionalOptions];
-  }, [parsedStyles, campaignRegions]);
+  }, [parsedStyles, campaignRegions, selectedPaperSize]);
 
   const activeVariantKey = `${colorMode}|${regionCode ?? ""}`;
-  const variantExists = availableVariants.some((v) => v.key === activeVariantKey);
+  const selectedVariant = availableVariants.find((v) => v.key === activeVariantKey) ?? availableVariants[0] ?? null;
+  const variantExists = selectedVariant?.key === activeVariantKey;
 
   useEffect(() => {
     if (!availableSizes.includes(paperSize)) {
@@ -321,7 +335,12 @@ export function PostersClient({
     }
   }, [availableVariants, variantExists]);
 
-  const posterType = toPosterStyle(paperSize, colorMode, regionCode);
+  const effectiveColorMode = selectedVariant?.colorMode ?? colorMode;
+  const effectiveRegionCode = selectedVariant?.regionCode ?? null;
+  const selectedPosterType = toPosterStyle(selectedPaperSize, effectiveColorMode, effectiveRegionCode);
+  const posterType = availableStyleSet.has(selectedPosterType)
+    ? selectedPosterType
+    : availableStyles[0] ?? "color";
   const posterPreviewUrl = campaign?.previewUrls[posterType] ?? null;
 
   const refresh = useCallback(async () => {
@@ -489,11 +508,11 @@ export function PostersClient({
             setCampaignSlug={setCampaignSlug}
             availableSizes={availableSizes}
             availableVariants={availableVariants}
-            paperSize={paperSize}
+            paperSize={selectedPaperSize}
             setPaperSize={setPaperSize}
-            colorMode={colorMode}
+            colorMode={effectiveColorMode}
             setColorMode={setColorMode}
-            regionCode={regionCode}
+            regionCode={effectiveRegionCode}
             setRegionCode={setRegionCode}
             posterType={posterType}
             posterPreviewUrl={posterPreviewUrl}
@@ -1647,12 +1666,12 @@ function VariantCombobox({
       <PopoverContent
         align="start"
         sideOffset={4}
-        className="w-[var(--radix-popover-trigger-width)] gap-2 rounded-none p-2"
+        className="w-[var(--radix-popover-trigger-width)] gap-0 rounded-none p-0"
       >
-        <div className="relative">
+        <div className="relative p-2">
           <Search
             size={14}
-            className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+            className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground"
             aria-hidden
           />
           <Input
@@ -1666,7 +1685,7 @@ function VariantCombobox({
         </div>
         <ul role="listbox" className="max-h-64 overflow-y-auto">
           {filtered.length === 0 ? (
-            <li className="px-2 py-1.5 text-xs text-muted-foreground">No matches</li>
+            <li className="px-3 py-1.5 text-xs text-muted-foreground">No matches</li>
           ) : (
             filtered.map((option) => {
               const selected = option.key === value;
@@ -1682,7 +1701,7 @@ function VariantCombobox({
                       setOpen(false);
                     }}
                     className={cn(
-                      "flex w-full cursor-pointer items-center justify-between gap-2 bg-transparent px-2 py-1.5 text-left text-sm text-foreground transition-colors hover:bg-foreground/8 focus:bg-foreground/8 focus:outline-none",
+                      "flex w-full cursor-pointer items-center justify-between gap-2 bg-transparent px-3 py-1.5 text-left text-sm text-foreground transition-colors hover:bg-foreground/8 focus:bg-foreground/8 focus:outline-none",
                       selected && "font-medium",
                     )}
                   >

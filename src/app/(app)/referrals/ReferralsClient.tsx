@@ -13,7 +13,6 @@ import {
   Search,
   Trash2,
 } from "lucide-react";
-import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -46,6 +45,12 @@ const VERIFICATION_TONES: Record<StardanceReferralVerificationStatus, string> = 
   unverified: "text-muted-foreground",
   rejected: "text-primary",
 };
+
+function formatPosterCode(code: string | null) {
+  if (code === null) return null;
+  const normalized = code.trim().toLowerCase();
+  return /^[a-z0-9]{5}$/.test(normalized) ? `a-${normalized}` : code;
+}
 
 function isReferralCode(value: unknown): value is StardanceReferralCode {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
@@ -92,6 +97,7 @@ export function ReferralsClient({
       return (
         referral.referralCodeLabel.toLowerCase().includes(trimmed) ||
         (referral.posterName?.toLowerCase().includes(trimmed) ?? false) ||
+        (referral.posterReferralCode?.toLowerCase().includes(trimmed) ?? false) ||
         referral.name.toLowerCase().includes(trimmed) ||
         referral.email.toLowerCase().includes(trimmed)
       );
@@ -355,6 +361,7 @@ export function ReferralsClient({
                   <tr className="border-b border-white/10">
                     <Th>{t("table.name")}</Th>
                     <Th>{t("table.code")}</Th>
+                    <Th>{t("table.type")}</Th>
                     <Th>{t("table.slack")}</Th>
                     <Th>{t("table.email")}</Th>
                     <Th>{t("table.hours-logged")}</Th>
@@ -364,7 +371,7 @@ export function ReferralsClient({
                 <tbody>
                   {filteredReferrals.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-5 py-6 font-body text-sm text-muted-foreground">
+                      <td colSpan={7} className="px-5 py-6 font-body text-sm text-muted-foreground">
                         {t("table.no-results")}
                       </td>
                     </tr>
@@ -377,15 +384,17 @@ export function ReferralsClient({
                         <Td>{referral.name}</Td>
                         <Td>
                           {referral.kind === "poster" ? (
-                            <Link
-                              href={`/posters#poster-${referral.posterId}`}
-                              className="ui-hover-underline text-foreground"
-                            >
-                              {referral.posterName ?? referral.referralCodeLabel}
-                            </Link>
+                            referral.posterName ??
+                            formatPosterCode(referral.posterReferralCode) ??
+                            referral.referralCodeLabel
                           ) : (
                             referral.referralCodeLabel
                           )}
+                        </Td>
+                        <Td>
+                          {referral.kind === "poster"
+                            ? t("table.type-poster")
+                            : t("table.type-referral")}
                         </Td>
                         <Td>{referral.slackId || "-"}</Td>
                         <Td>{referral.email || "-"}</Td>

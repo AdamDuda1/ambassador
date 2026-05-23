@@ -15,8 +15,12 @@ export async function register() {
   const { startStardanceRsvpSyncScheduler } = await import(
     "@/lib/stardance-rsvp-sync-scheduler"
   );
+  const { startShirtAutoDispatchScheduler } = await import(
+    "@/lib/shirt/auto-dispatch-scheduler"
+  );
 
   startAirtableSyncScheduler();
   startHcbGrantScheduler();
   startStardanceRsvpSyncScheduler();
+  startShirtAutoDispatchScheduler();
 }

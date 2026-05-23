@@ -295,6 +295,9 @@ referrals:
   table:
     name: Name
     code: Code
+    type: Type
+    type-referral: Referral
+    type-poster: Poster
     slack: Slack
     email: Email
     hours-logged: Hours logged
@@ -340,8 +343,16 @@ shirt:
     place: Place order
     placing: Placing order...
   order:
-    pending-title: Order received
-    pending-body: "Your size {size} shirt is queued for review. We'll ship it once the fulfillment team approves it."
+    pending-title: Pending for 24h
+    pending-body: "Your size {size} shirt is locked in. It auto-ships to the warehouse after a 24-hour hold so you have time to change your mind."
+    pending-countdown: "Ships to the warehouse in {countdown}. You can cancel any time before then."
+    pending-dispatching: Hold's up — your order is being sent to the warehouse now.
+    pending-warning: "Once the 24-hour hold ends, the order is sent to the warehouse and cannot be cancelled. No exceptions."
+    cancel-cta: Cancel this order
+    cancel-pending: Cancelling...
+    cancel-confirm: "Cancel this shirt order? You can place a new one right after."
+    cancel-too-late: Too late — this order already left for the warehouse and can no longer be cancelled.
+    cancel-not-cancellable: This order is no longer cancellable.
     approved-title: Order approved
     approved-body: "Your size {size} shirt has been sent to the warehouse. Track shipping below."
     approved-message: "Your order is on the way. Track shipping <link>here</link>."
@@ -632,11 +643,13 @@ admin:
       open: Open
     status-filter:
       all: All statuses
-      pending: Pending
+      pending: Pending for 24h
       approved: Approved
       rejected: Rejected
       failed: Failed
       cancelled: Cancelled
+    status-display:
+      pending: pending for 24h
   order-detail:
     page-title: Order details
     breadcrumb: Orders
@@ -644,8 +657,8 @@ admin:
     open-user-page: Open user page ↗
     sections:
       review-actions:
-        title: Review Actions
-        description: Approve this order to dispatch it to the warehouse, or reject with a note.
+        title: Admin override
+        description: Orders auto-ship to the warehouse 24 hours after the ambassador places them. Use these controls only to bypass the hold or kill the order before the ambassador does.
       order:
         title: Order
         description: What the ambassador ordered.
@@ -660,6 +673,13 @@ admin:
       approve-existing: Mark approved
       approve-confirmation-first: Are you sure?
       approve-confirmation-second: Are you really sure? Warehouse orders mostly cannot be cancelled.
+      bypass-embargo: Bypass 24h hold & ship now
+      bypass-confirmation-first: "Are you sure? This skips the ambassador's 24h cancellation window."
+      bypass-confirmation-second: Are you really sure? Once it's at the warehouse it cannot be cancelled.
+      embargo-active: "Auto-ships to the warehouse at {dispatchAt}. The ambassador can self-cancel until then."
+      embargo-expired-auto: "The 24h hold has lapsed. The next scheduler tick will auto-ship this order."
+      embargo-bypass-explainer: Only bypass the hold if there's a genuine reason to skip the cancellation window.
+      non-pending: This order is no longer pending — no admin action available.
       reject: Reject with note
       reject-note-label: Reject note (Optional)
       reject-note-placeholder: Why this order is being rejected
@@ -686,6 +706,7 @@ admin:
       internal-fail-reason: Internal fail reason
       placed: Placed
       last-updated: Last updated
+      dispatch-at: Auto-ships to warehouse at
       reviewed: Reviewed
       reviewed-by: Reviewed by
       user-email: User email

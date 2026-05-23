@@ -62,6 +62,7 @@ export type StardanceReferral = {
   referralCodeLabel: string;
   posterId: string | null;
   posterName: string | null;
+  posterReferralCode: string | null;
 };
 
 export class StardanceReferralCodeError extends Error {
@@ -325,6 +326,12 @@ export async function listStardanceReferralCodesForUser(userId: string) {
     FROM stardance_referral_codes
     WHERE user_id = ${userId}
       AND archived_at IS NULL
+      AND NOT EXISTS (
+        SELECT 1
+        FROM posters
+        WHERE posters.user_id = stardance_referral_codes.user_id
+          AND LOWER(posters.referral_code) = LOWER(stardance_referral_codes.code)
+      )
     ORDER BY
       CASE WHEN kind = 'primary' THEN 0 ELSE 1 END,
       created_at ASC,
@@ -341,6 +348,12 @@ export async function listArchivedStardanceReferralCodesForUser(userId: string) 
     FROM stardance_referral_codes
     WHERE user_id = ${userId}
       AND archived_at IS NOT NULL
+      AND NOT EXISTS (
+        SELECT 1
+        FROM posters
+        WHERE posters.user_id = stardance_referral_codes.user_id
+          AND LOWER(posters.referral_code) = LOWER(stardance_referral_codes.code)
+      )
     ORDER BY archived_at DESC, id ASC
   `;
 
@@ -582,6 +595,7 @@ type StardanceReferralRow = {
   referral_code_label: string;
   poster_id: string | null;
   poster_name: string | null;
+  poster_referral_code: string | null;
 };
 
 type StardanceRsvpReferralPayload = {
@@ -845,7 +859,8 @@ export async function listStardanceReferralsForUser(
           r.referred_at,
           c.label AS referral_code_label,
           p.id AS poster_id,
-          NULLIF(BTRIM(p.name), '') AS poster_name
+          NULLIF(BTRIM(p.name), '') AS poster_name,
+          p.referral_code AS poster_referral_code
         FROM stardance_referrals r
         JOIN stardance_referral_codes c ON c.id = r.referral_code_id
         LEFT JOIN posters p ON p.user_id = r.user_id AND LOWER(p.referral_code) = LOWER(c.code)
@@ -866,7 +881,8 @@ export async function listStardanceReferralsForUser(
           r.referred_at,
           c.label AS referral_code_label,
           p.id AS poster_id,
-          NULLIF(BTRIM(p.name), '') AS poster_name
+          NULLIF(BTRIM(p.name), '') AS poster_name,
+          p.referral_code AS poster_referral_code
         FROM stardance_referrals r
         JOIN stardance_referral_codes c ON c.id = r.referral_code_id
         LEFT JOIN posters p ON p.user_id = r.user_id AND LOWER(p.referral_code) = LOWER(c.code)
@@ -874,6 +890,7 @@ export async function listStardanceReferralsForUser(
           AND (
             LOWER(c.label) LIKE ${pattern}
             OR LOWER(NULLIF(BTRIM(p.name), '')) LIKE ${pattern}
+            OR LOWER(p.referral_code) LIKE ${pattern}
           )
         ORDER BY r.referred_at DESC, r.id ASC
       `;
@@ -893,6 +910,7 @@ export async function listStardanceReferralsForUser(
       referralCodeLabel: row.referral_code_label,
       posterId: row.poster_id,
       posterName: row.poster_name,
+      posterReferralCode: row.poster_referral_code,
     }))
     .sort((a, b) => {
       const diff = new Date(b.referredAt).getTime() - new Date(a.referredAt).getTime();
